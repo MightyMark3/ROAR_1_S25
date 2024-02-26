@@ -55,6 +55,8 @@ class RoarCompetitionSolution:
         self.current_section = -1
 
     async def initialize(self) -> None:
+        # FIXME check to make sure that forcing your own waypoints here is actually legal. If not, move it to somewhere that is legal
+        self.maneuverable_waypoints = roar_py_interface.RoarPyWaypoint.load_waypoint_list(np.load("competition_code\\waypoints.npz")) 
         num_sections = 10
         indexes_per_section = len(self.maneuverable_waypoints) // num_sections
         self.section_indeces = [indexes_per_section * i for i in range(0, num_sections)]
@@ -106,14 +108,14 @@ class RoarCompetitionSolution:
                 elapsed_ticks = self.num_ticks - self.section_start_ticks
                 self.section_start_ticks = self.num_ticks
                 self.current_section = i
-                print(f"Section {i}: {elapsed_ticks}")
+                print(f"Section {i}: {elapsed_ticks} ticks")
 
         new_waypoint_index = self.get_lookahead_index(current_speed_kmh)
         waypoint_to_follow = self.next_waypoint_smooth(current_speed_kmh)
 
         # Proportional controller to steer the vehicle
         steer_control = self.lat_pid_controller.run(
-            vehicle_location, vehicle_rotation, current_speed_kmh, waypoint_to_follow)
+            vehicle_location, vehicle_rotation, current_speed_kmh, waypoint_to_follow, self.current_section)
 
         # Proportional controller to control the vehicle's speed
         waypoints_for_throttle = \
@@ -130,6 +132,10 @@ class RoarCompetitionSolution:
             "target_gear": gear
         }
 
+        # currentWaypoint = self.maneuverable_waypoints[self.current_waypoint_idx].location
+
+        # print(f"Target waypoint: {currentWaypoint}\nCurrent location: {vehicle_location}\nDistance to waypoint: {math.sqrt((currentWaypoint[0] - vehicle_location[0]) ** 2 + (currentWaypoint[1] - vehicle_location[1]) ** 2)}")
+
         # print("--- " + str(throttle) + " " + str(brake) 
         #             + " steer " + str(steer_control)
         #             + " loc: " + str(vehicle_location)
@@ -142,14 +148,17 @@ class RoarCompetitionSolution:
         return control
 
     def get_lookahead_value(self, speed):
+        """
+        Returns the number of waypoints to look ahead based on the speed the car is currently going
+        """
         speed_to_lookahead_dict = {
             70: 11,
-            90: 11,
-            110: 12,
-            130: 13,
-            160: 15,
-            180: 19,
-            200: 23,
+            90: 12,
+            110: 13,
+            130: 14,
+            160: 16,
+            180: 20,
+            200: 24,
             300: 24
         }
         num_waypoints = 3
@@ -160,6 +169,9 @@ class RoarCompetitionSolution:
         return num_waypoints
 
     def get_lookahead_index(self, speed):
+        """
+        Adds the lookahead waypoint to the current waypoint and normalizes it so that the value does not go out of bounds
+        """
         num_waypoints = self.get_lookahead_value(speed)
         # print("speed " + str(speed) 
         #       + " cur_ind " + str(self.current_waypoint_idx) 
@@ -168,77 +180,99 @@ class RoarCompetitionSolution:
         return (self.current_waypoint_idx + num_waypoints) % len(self.maneuverable_waypoints)
     
     def get_lateral_pid_config(self):
-        conf = {
+        """
+        Returns the PID values for the lateral (steering) PID
+        """
+        config = {
+        # "60": {
+        #         "Kp": 0.8,
+        #         "Kd": 0.05,
+        #         "Ki": 0.05
+        # },
+        # "70": {
+        #         "Kp": 0.7,
+        #         "Kd": 0.07,
+        #         "Ki": 0.07
+        # },
+        # "80": {
+        #         "Kp": 0.66,
+        #         "Kd": 0.08,
+        #         "Ki": 0.08
+        # },
+        # FIXME first three speed PID values are just to fix waypoint navigation issues, as the waypoint creator starts the car slightly forward and messes with navigation
         "60": {
-                "Kp": 0.8,
-                "Kd": 0.05,
-                "Ki": 0.05
+                "Kp": 0.0,
+                "Kd": 0.0,
+                "Ki": 0.0
         },
         "70": {
-                "Kp": 0.7,
-                "Kd": 0.07,
-                "Ki": 0.07
+                "Kp": 0.0,
+                "Kd": 0.0,
+                "Ki": 0.0
         },
         "80": {
-                "Kp": 0.66,
-                "Kd": 0.08,
-                "Ki": 0.08
+                "Kp": 0.0,
+                "Kd": 0.0,
+                "Ki": 0.0
         },
         "90": {
-                "Kp": 0.63,
+                "Kp": 0.58,
                 "Kd": 0.09,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.6,
-                "Kd": 0.1,
-                "Ki": 0.1
-        },
-        "120": {
                 "Kp": 0.52,
                 "Kd": 0.1,
                 "Ki": 0.1
         },
+        "120": {
+                "Kp": 0.47,
+                "Kd": 0.1,
+                "Ki": 0.1
+        },
         "130": {
-                "Kp": 0.51,
+                "Kp": 0.43,
                 "Kd": 0.1,
                 "Ki": 0.09
         },
         "140": {
-                "Kp": 0.45,
+                "Kp": 0.38,
                 "Kd": 0.1,
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.4,
-                "Kd": 0.05,
+                "Kp": 0.33,
+                "Kd": 0.12,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.28,
-                "Kd": 0.02,
+                "Kp": 0.21,
+                "Kd": 0.1,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.28,
-                "Kd": 0.03,
+                "Kp": 0.18,
+                "Kd": 0.1,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.26,
-                "Kd": 0.04,
+                "Kp": 0.15,
+                "Kd": 0.1,
                 "Ki": 0.05
         },
         "300": {
-                "Kp": 0.205,
+                "Kp": 0.1,
                 "Kd": 0.008,
                 "Ki": 0.017
         }
         }
-        return conf
+        return config
 
     # The idea and code for averaging points is from smooth_waypoint_following_local_planner.py
     def next_waypoint_smooth(self, current_speed: float):
+        """
+        If the speed is higher than 70, 'smooth out' the path that the car will take
+        """
         if current_speed > 70 and current_speed < 300:
             target_waypoint = self.average_point(current_speed)
         else:
@@ -247,15 +281,19 @@ class RoarCompetitionSolution:
         return target_waypoint
 
     def average_point(self, current_speed):
+        """
+        Returns a new averaged waypoint based on the location of a number of other waypoints
+        """
         next_waypoint_index = self.get_lookahead_index(current_speed)
         lookahead_value = self.get_lookahead_value(current_speed)
         num_points = lookahead_value * 2
         if self.current_section in [0]:
             num_points = lookahead_value
-        if self.current_section in [6, 7, 8, 9]:
+        if self.current_section in [6, 7]:
             num_points = lookahead_value // 2
-        if self.current_section in [4]:
-            num_points = lookahead_value * 3 // 5
+        if self.current_section in [8, 9]:
+            num_points = lookahead_value // 2
+
         start_index_for_avg = (next_waypoint_index - (num_points // 2)) % len(self.maneuverable_waypoints)
 
         next_waypoint = self.maneuverable_waypoints[next_waypoint_index]
@@ -296,7 +334,7 @@ class LatPIDController():
         self._error_buffer = deque(maxlen=10)
         self._dt = dt
 
-    def run(self, vehicle_location, vehicle_rotation, current_speed, next_waypoint) -> float:
+    def run(self, vehicle_location, vehicle_rotation, current_speed, next_waypoint, sector) -> float:
         """
         Calculates a vector that represent where you are going.
         Args:
@@ -340,7 +378,7 @@ class LatPIDController():
             _de = 0.0
             _ie = 0.0
 
-        k_p, k_d, k_i = self.find_k_values(current_speed=current_speed, config=self.config)
+        k_p, k_d, k_i = self.find_k_values(current_speed=current_speed, config=self.config, sector=sector)
 
         lat_control = float(
             np.clip((k_p * error) + (k_d * _de) + (k_i * _ie), self.steering_boundary[0], self.steering_boundary[1])
@@ -357,13 +395,25 @@ class LatPIDController():
 
         return lat_control
     
-    def find_k_values(self, current_speed: float, config: dict) -> np.array:
+    def find_k_values(self, current_speed: float, config: dict, sector: int) -> np.array:
+        """
+        Returns the PID lateral PID values based on the current speed and sector
+        """
+
         k_p, k_d, k_i = 1, 0, 0
         for speed_upper_bound, kvalues in config.items():
             speed_upper_bound = float(speed_upper_bound)
             if current_speed < speed_upper_bound:
                 k_p, k_d, k_i = kvalues["Kp"], kvalues["Kd"], kvalues["Ki"]
                 break
+        if (sector in [5]):
+            k_p = 0.425
+            k_d / 1.5
+        elif (sector in [6, 7]):
+            k_p = 0.95
+            # k_d * 2
+        elif (sector in [8, 9]):
+            k_p = 0.557
         return np.array([k_p, k_d, k_i])
 
     
@@ -405,8 +455,8 @@ class ThrottleController():
 
     def run(self, waypoints, current_location, current_speed, current_section) -> (float, float, int):
         self.tick_counter += 1
-        throttle, brake, handbrake = self.get_throttle_and_brake(current_location, current_speed, current_section, waypoints)
-        gear = max(1, (int)(current_speed / 60))
+        throttle, brake = self.get_throttle_and_brake(current_location, current_speed, current_section, waypoints)
+        gear = max(1, (int)(current_speed / 55))
         if throttle == -1:
             gear = -1
 
@@ -484,7 +534,7 @@ class ThrottleController():
                     self.dprint("tb: tick" + str(self.tick_counter) + " brake: counter" + str(self.brake_ticks))
                     return -1, 1, 1
                 # if speed is not decreasing fast, hit the brake.
-                if self.brake_ticks <= 0 and not self.speed_dropping_fast(percent_change_per_tick, speed_data.current_speed):
+                if self.brake_ticks <= 0 and not self.isSpeedDroppingFast(percent_change_per_tick, speed_data.current_speed):
                     # start braking, and set for how many ticks to brake
                     self.brake_ticks = math.floor((percent_of_max - 1) / percent_change_per_tick)
                     # TODO: try 
@@ -497,7 +547,7 @@ class ThrottleController():
                     self.brake_ticks = 0 # done slowing down. clear brake_ticks
                     return 1, 0, 0
             else:
-                if self.speed_dropping_fast(percent_change_per_tick, speed_data.current_speed):
+                if self.isSpeedDroppingFast(percent_change_per_tick, speed_data.current_speed):
                     # speed is already dropping fast, ok to throttle because the effect of throttle is delayed
                     self.dprint("tb: tick" + str(self.tick_counter) + " brake: throttle early2: sp_ch=" + str(percent_speed_change))
                     self.brake_ticks = 0 # done slowing down. clear brake_ticks
@@ -512,7 +562,7 @@ class ThrottleController():
         else:
             self.brake_ticks = 0 # done slowing down. clear brake_ticks
             # Consider speeding up
-            if self.speed_dropping_fast(percent_change_per_tick, speed_data.current_speed):
+            if self.isSpeedDroppingFast(percent_change_per_tick, speed_data.current_speed):
                 # speed is dropping fast, ok to throttle because the effect of throttle is delayed
                 self.dprint("tb: tick" + str(self.tick_counter) + " throttle: full speed drop: sp_ch=" + str(percent_speed_change))
                 return 1, 0, 0
@@ -528,12 +578,15 @@ class ThrottleController():
                 return throttle_to_maintain, 0, 0
 
     # used to detect when speed is dropping due to brakes applied earlier. speed delta has a steep negative slope.
-    def speed_dropping_fast(self, percent_change_per_tick: float, current_speed):
+    def isSpeedDroppingFast(self, percent_change_per_tick: float, current_speed):
+        """Detects if the speed of the car is dropping quickly.
+        Returns true if the speed is dropping fast"""
         percent_speed_change = (current_speed - self.previous_speed) / (self.previous_speed + 0.0001) # avoid division by zero
         return percent_speed_change < (-percent_change_per_tick / 2)
 
     # find speed_data with smallest recommended speed
     def select_speed(self, speed_data: [SpeedData]):
+        """Selects the smallest speed out of the speeds provided"""
         min_speed = 1000
         index_of_min_speed = -1
         for i, sd in enumerate(speed_data):
@@ -547,7 +600,7 @@ class ThrottleController():
             return speed_data[0]
     
     def get_throttle_to_maintain_speed(self, current_speed: float):
-        throttle = 0.6 + current_speed/1000
+        throttle = 0.65 + current_speed / 500
         return throttle
 
     def speed_for_turn(self, distance: float, target_speed: float, current_speed: float):
@@ -584,6 +637,7 @@ class ThrottleController():
         return points
 
     def get_radius(self, wp):
+        """Gets the radius of a turn given 3 waypoints"""
         point1 = (wp[0].location[0], wp[0].location[1])
         point2 = (wp[1].location[0], wp[1].location[1])
         point3 = (wp[2].location[0], wp[2].location[1])

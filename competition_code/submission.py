@@ -184,21 +184,6 @@ class RoarCompetitionSolution:
         Returns the PID values for the lateral (steering) PID
         """
         config = {
-        # "60": {
-        #         "Kp": 0.8,
-        #         "Kd": 0.05,
-        #         "Ki": 0.05
-        # },
-        # "70": {
-        #         "Kp": 0.7,
-        #         "Kd": 0.07,
-        #         "Ki": 0.07
-        # },
-        # "80": {
-        #         "Kp": 0.66,
-        #         "Kd": 0.08,
-        #         "Ki": 0.08
-        # },
         # FIXME first three speed PID values are just to fix waypoint navigation issues, as the waypoint creator starts the car slightly forward and messes with navigation
         "60": {
                 "Kp": 0.0,
@@ -216,53 +201,53 @@ class RoarCompetitionSolution:
                 "Ki": 0.0
         },
         "90": {
-                "Kp": 0.58,
-                "Kd": 0.09,
+                "Kp": 0.68,
+                "Kd": 0,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.52,
-                "Kd": 0.1,
+                "Kp": 0.62,
+                "Kd": 0,
                 "Ki": 0.1
         },
         "120": {
-                "Kp": 0.47,
-                "Kd": 0.1,
+                "Kp": 0.57,
+                "Kd": 0,
                 "Ki": 0.1
         },
         "130": {
-                "Kp": 0.43,
-                "Kd": 0.1,
+                "Kp": 0.53,
+                "Kd": 0,
                 "Ki": 0.09
         },
         "140": {
-                "Kp": 0.38,
-                "Kd": 0.1,
+                "Kp": 0.48,
+                "Kd": 0,
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.33,
-                "Kd": 0.12,
+                "Kp": 0.43,
+                "Kd": 0,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.21,
-                "Kd": 0.1,
+                "Kp": 0.38,
+                "Kd": 0,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.18,
-                "Kd": 0.1,
+                "Kp": 0.33,
+                "Kd": 0,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.15,
-                "Kd": 0.1,
+                "Kp": 0.28,
+                "Kd": 0,
                 "Ki": 0.05
         },
         "300": {
-                "Kp": 0.1,
-                "Kd": 0.008,
+                "Kp": 0.2,
+                "Kd": 0,
                 "Ki": 0.017
         }
         }
@@ -337,6 +322,7 @@ class LatPIDController():
     def run(self, vehicle_location, vehicle_rotation, current_speed, next_waypoint, sector) -> float:
         """
         Calculates a vector that represent where you are going.
+        
         Args:
             next_waypoint ():
             **kwargs ():
@@ -408,10 +394,8 @@ class LatPIDController():
                 break
         if (sector in [5]):
             k_p = 0.425
-            k_d / 1.5
         elif (sector in [6, 7]):
-            k_p = 0.95
-            # k_d * 2
+            k_p = 1.25
         elif (sector in [8, 9]):
             k_p = 0.557
         return np.array([k_p, k_d, k_i])
@@ -473,6 +457,9 @@ class ThrottleController():
         return throttle, brake, handbrake, gear
 
     def get_throttle_and_brake(self, current_location, current_speed, current_section, waypoints):
+        """
+        Returns throttle and brake values based off the car's current location and the radius of the approaching turn
+        """
 
         nextWaypoint = self.get_next_interesting_waypoints(current_location, waypoints)
         r1 = self.get_radius(nextWaypoint[self.close_index : self.close_index + 3])
@@ -511,7 +498,9 @@ class ThrottleController():
         return throttle, brake, handbrake
 
     def speed_data_to_throttle_and_brake(self, speed_data: SpeedData):
-        """Returns throttle, brake, and handbrake values based on the speed data provided"""
+        """
+        Converts speed data into throttle and brake values
+        """
         percent_of_max = speed_data.current_speed / speed_data.recommended_speed_now
 
         # self.dprint("dist=" + str(round(speed_data.distance_to_section)) + " cs=" + str(round(speed_data.current_speed, 2)) 
@@ -579,14 +568,18 @@ class ThrottleController():
 
     # used to detect when speed is dropping due to brakes applied earlier. speed delta has a steep negative slope.
     def isSpeedDroppingFast(self, percent_change_per_tick: float, current_speed):
-        """Detects if the speed of the car is dropping quickly.
-        Returns true if the speed is dropping fast"""
+        """
+        Detects if the speed of the car is dropping quickly.
+        Returns true if the speed is dropping fast
+        """
         percent_speed_change = (current_speed - self.previous_speed) / (self.previous_speed + 0.0001) # avoid division by zero
         return percent_speed_change < (-percent_change_per_tick / 2)
 
     # find speed_data with smallest recommended speed
     def select_speed(self, speed_data: [SpeedData]):
-        """Selects the smallest speed out of the speeds provided"""
+        """
+        Selects the smallest speed out of the speeds provided
+        """
         min_speed = 1000
         index_of_min_speed = -1
         for i, sd in enumerate(speed_data):
@@ -600,15 +593,24 @@ class ThrottleController():
             return speed_data[0]
     
     def get_throttle_to_maintain_speed(self, current_speed: float):
+        """
+        Returns a throttle value to maintain the current speed
+        """
         throttle = 0.65 + current_speed / 500
         return throttle
 
     def speed_for_turn(self, distance: float, target_speed: float, current_speed: float):
-        d = (1/675) * (target_speed**2) + distance
-        max_speed = math.sqrt(675 * d)
+        """
+        Takes in a target speed and distance and produces a speed that the car should target. Returns a SpeedData object
+        """
+        d = (1/675) * (target_speed ** 2) + distance
+        max_speed = math.sqrt(800 * d)
         return SpeedData(distance, current_speed, target_speed, max_speed)
 
     def get_next_interesting_waypoints(self, current_location, more_waypoints):
+        """
+        Takes the current location of the car and returns a new list of waypoints that are close to the car
+        """
         # return a list of points with distances approximately as given 
         # in intended_target_distance[] from the current location.
         points = []
@@ -637,7 +639,9 @@ class ThrottleController():
         return points
 
     def get_radius(self, wp):
-        """Gets the radius of a turn given 3 waypoints"""
+        """
+        Gets the radius of a turn given 3 waypoints by using the Menger Curve Formula
+        """
         point1 = (wp[0].location[0], wp[0].location[1])
         point2 = (wp[1].location[0], wp[1].location[1])
         point3 = (wp[2].location[0], wp[2].location[1])
@@ -662,6 +666,9 @@ class ThrottleController():
         return radius
 
     def get_target_speed(self, radius: float, current_section):
+        """
+        Returns a target speed based off of the radius of the turn
+        """
         if radius >= self.max_radius:
             return self.max_speed
         mu = 2.0
@@ -671,16 +678,22 @@ class ThrottleController():
             mu = 1.5
         if current_section == 9:
             mu = 1.5
-        target_speed = math.sqrt(mu*9.81*radius) * 3.6
+        target_speed = math.sqrt(mu * 9.81 * radius) * 3.6
         return max(20, min(target_speed, self.max_speed))  # clamp between 20 and max_speed
 
     def print_speed(self, text: str, s1: float, s2: float, s3: float, s4: float, curr_s: float):
+        """
+        Prints debug speed values
+        """
         self.dprint(text + " s1= " + str(round(s1, 2)) + " s2= " + str(round(s2, 2)) + " s3= " 
                     + str(round(s3, 2)) + " s4= " + str(round(s4, 2))
             + " cspeed= " + str(round(curr_s, 2)))
 
     # debug print
     def dprint(self, text):
+        """
+        Prints debug text
+        """
         if self.display_debug:
             print(text)
             self.debug_strings.append(text)

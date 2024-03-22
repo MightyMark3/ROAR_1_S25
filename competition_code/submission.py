@@ -56,7 +56,7 @@ class RoarCompetitionSolution:
 
     async def initialize(self) -> None:
         # FIXME check to make sure that forcing your own waypoints here is actually legal. If not, move it to somewhere that is legal
-        self.maneuverable_waypoints = roar_py_interface.RoarPyWaypoint.load_waypoint_list(np.load("competition_code\\waypoints.npz")) 
+        self.maneuverable_waypoints = roar_py_interface.RoarPyWaypoint.load_waypoint_list(np.load("competition_code\\waypoints copy.npz")) 
         num_sections = 10
         indexes_per_section = len(self.maneuverable_waypoints) // num_sections
         self.section_indeces = [indexes_per_section * i for i in range(0, num_sections)]
@@ -201,52 +201,57 @@ class RoarCompetitionSolution:
                 "Ki": 0.0
         },
         "90": {
-                "Kp": 0.68,
+                "Kp": 0.8,
                 "Kd": 0,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.62,
+                "Kp": 0.75,
                 "Kd": 0,
                 "Ki": 0.1
         },
         "120": {
-                "Kp": 0.57,
+                "Kp": 0.7,
                 "Kd": 0,
                 "Ki": 0.1
         },
         "130": {
-                "Kp": 0.53,
+                "Kp": 0.65,
                 "Kd": 0,
                 "Ki": 0.09
         },
         "140": {
-                "Kp": 0.48,
+                "Kp": 0.65,
+                "Kd": 0,
+                "Ki": 0.09
+        },
+        "150": {
+                "Kp": 0.65,
                 "Kd": 0,
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.43,
+                "Kp": 0.72,
                 "Kd": 0,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.38,
+                "Kp": 0.67,
                 "Kd": 0,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.33,
+                "Kp": 0.62,
                 "Kd": 0,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.28,
+                "Kp": 0.5,
                 "Kd": 0,
                 "Ki": 0.05
         },
         "300": {
-                "Kp": 0.2,
+                "Kp": 0.4,
                 "Kd": 0,
                 "Ki": 0.017
         }
@@ -439,7 +444,7 @@ class ThrottleController():
 
     def run(self, waypoints, current_location, current_speed, current_section) -> (float, float, int):
         self.tick_counter += 1
-        throttle, brake = self.get_throttle_and_brake(current_location, current_speed, current_section, waypoints)
+        throttle, brake, handbrake = self.get_throttle_and_brake(current_location, current_speed, current_section, waypoints)
         gear = max(1, (int)(current_speed / 55))
         if throttle == -1:
             gear = -1
@@ -499,7 +504,13 @@ class ThrottleController():
 
     def speed_data_to_throttle_and_brake(self, speed_data: SpeedData):
         """
-        Converts speed data into throttle and brake values
+        Converts speed data to throttle and brake values
+
+        Args:
+            speed_data: A speed_data object
+
+        Returns:
+            Tuple: A tuple containing throttle, brake, and handbrake values
         """
         percent_of_max = speed_data.current_speed / speed_data.recommended_speed_now
 
@@ -507,7 +518,7 @@ class ThrottleController():
         #             + " ts= " + str(round(speed_data.target_speed_at_distance, 2)) 
         #             + " maxs= " + str(round(speed_data.recommended_speed_now, 2)) + " pcnt= " + str(round(percent_of_max, 2)))
 
-        percent_change_per_tick = 0.13 # speed drop for one time-tick of braking
+        percent_change_per_tick = 0.08 # speed drop for one time-tick of braking
         speed_up_threshold = 0.99
         throttle_decrease_multiple = 0.7
         throttle_increase_multiple = 1.25

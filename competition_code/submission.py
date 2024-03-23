@@ -5,6 +5,8 @@ Please do not change anything else but fill out the to-do sections.
 
 from collections import deque
 from functools import reduce
+import json
+import os
 from typing import List, Tuple, Dict, Optional
 import math
 import numpy as np
@@ -183,79 +185,8 @@ class RoarCompetitionSolution:
         """
         Returns the PID values for the lateral (steering) PID
         """
-        config = {
-        # FIXME first three speed PID values are just to fix waypoint navigation issues, as the waypoint creator starts the car slightly forward and messes with navigation
-        "60": {
-                "Kp": 0.0,
-                "Kd": 0.0,
-                "Ki": 0.0
-        },
-        "70": {
-                "Kp": 0.0,
-                "Kd": 0.0,
-                "Ki": 0.0
-        },
-        "80": {
-                "Kp": 0.0,
-                "Kd": 0.0,
-                "Ki": 0.0
-        },
-        "90": {
-                "Kp": 0.8,
-                "Kd": 0,
-                "Ki": 0.09
-        },
-        "100": {
-                "Kp": 0.75,
-                "Kd": 0,
-                "Ki": 0.1
-        },
-        "120": {
-                "Kp": 0.7,
-                "Kd": 0,
-                "Ki": 0.1
-        },
-        "130": {
-                "Kp": 0.65,
-                "Kd": 0,
-                "Ki": 0.09
-        },
-        "140": {
-                "Kp": 0.65,
-                "Kd": 0,
-                "Ki": 0.09
-        },
-        "150": {
-                "Kp": 0.65,
-                "Kd": 0,
-                "Ki": 0.09
-        },
-        "160": {
-                "Kp": 0.72,
-                "Kd": 0,
-                "Ki": 0.06
-        },
-        "180": {
-                "Kp": 0.67,
-                "Kd": 0,
-                "Ki": 0.05
-        },
-        "200": {
-                "Kp": 0.62,
-                "Kd": 0,
-                "Ki": 0.04
-        },
-        "230": {
-                "Kp": 0.5,
-                "Kd": 0,
-                "Ki": 0.05
-        },
-        "300": {
-                "Kp": 0.4,
-                "Kd": 0,
-                "Ki": 0.017
-        }
-        }
+        with open(f"{os.path.dirname(__file__)}\\configs\\LatPIDConfig.json", "r") as file:
+            config = json.load(file)
         return config
 
     # The idea and code for averaging points is from smooth_waypoint_following_local_planner.py

@@ -96,18 +96,7 @@ class RoarCompetitionSolution:
             )[50:]
         )
 
-        sectionLocations = [
-            [-278, 372],
-            [64, 890],
-            [511, 1037],
-            [762, 908],
-            [198, 307],
-            [-12, 38],
-            [-85, -339],
-            [-150, -1042],
-            [-318, -991],
-            [-352, -119],
-        ]
+        sectionLocations = [[-278, 372], [64, 890], [511, 1037], [762, 908], [198, 307], [-12, 38], [-85, -339], [-150, -1042], [-318, -991], [-352, -119]]
         for i in sectionLocations:
             self.section_indeces.append(
                 findClosestIndex(i, self.maneuverable_waypoints)
@@ -202,6 +191,7 @@ class RoarCompetitionSolution:
             "target_gear": gear,  # Gears do not appear to have an impact on speed
         }
         
+        # Store debug data for later use
         if useDebug:
             debugData[self.num_ticks] = {}
             debugData[self.num_ticks]["loc"] = [
@@ -213,12 +203,13 @@ class RoarCompetitionSolution:
             debugData[self.num_ticks]["steer"] = round(float(control["steer"]), 10)
             debugData[self.num_ticks]["speed"] = round(current_speed_kmh, 3)
             debugData[self.num_ticks]["lap"] = self.lapNum
-
+            
+            # Print debug data
             if useDebugPrinting and self.num_ticks % 5 == 0:
                 print(
                     f"- Target waypoint: ({waypoint_to_follow.location[0]:.2f}, {waypoint_to_follow.location[1]:.2f}) index {nextWaypointIndex} \n\
-Current location: ({vehicle_location[0]:.2f}, {vehicle_location[1]:.2f}) index {self.current_waypoint_idx} section {self.current_section} \n\
-Distance to target waypoint: {math.sqrt((waypoint_to_follow.location[0] - vehicle_location[0]) ** 2 + (waypoint_to_follow.location[1] - vehicle_location[1]) ** 2):.3f}\n"
+Current location: ({vehicle_location[0].item():.2f}, {vehicle_location[1].item():.2f}) index {self.current_waypoint_idx} section {self.current_section} \n\
+Distance to target waypoint: {math.sqrt((waypoint_to_follow.location[0] - vehicle_location[0].item()) ** 2 + (waypoint_to_follow.location[1] - vehicle_location[1].item()) ** 2):.3f}\n"
                 )
 
                 print(
@@ -272,11 +263,12 @@ Steer: {control['steer']:.10f} \n"
         return (self.current_waypoint_idx + num_waypoints) % len(
             self.maneuverable_waypoints
         )
-
+    
+    # Old code (used with PID)
     # def get_lateral_pid_config(self):
     #     """
     #     Returns the PID values for the lateral (steering) PID
-    #     """
+    #     """   
     #     with open(
     #         f"{os.path.dirname(__file__)}\\configs\\LatPIDConfig.json", "r"
     #     ) as file:

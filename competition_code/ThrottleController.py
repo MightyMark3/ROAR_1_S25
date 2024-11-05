@@ -64,7 +64,8 @@ class ThrottleController:
         """
         Returns throttle and brake values based off the car's current location and the radius of the approaching turn
         """
-
+        
+        # TODO: Find a way to pre-calculate turn locations (start and end points) for more accurate values
         nextWaypoint = self.get_next_interesting_waypoints(current_location, waypoints)
         r1 = self.get_radius(nextWaypoint[self.close_index : self.close_index + 3])
         r2 = self.get_radius(nextWaypoint[self.mid_index : self.mid_index + 3])

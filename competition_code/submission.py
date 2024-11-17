@@ -18,7 +18,7 @@ import atexit
 # from scipy.interpolate import interp1d
 
 useDebug = True
-useDebugPrinting = False
+useDebugPrinting = True
 debugData = {}
 
 
@@ -47,6 +47,65 @@ def findClosestIndex(location, waypoints: List[roar_py_interface.RoarPyWaypoint]
             closestInd = i
     return closestInd % len(waypoints)
 
+def get_radius(loc1, loc2, loc3):
+    """Returns the radius of a curve given 3 waypoints using the Menger Curvature Formula
+
+    Args:
+        wp ([roar_py_interface.RoarPyWaypoint]): A list of 3 RoarPyWaypoints
+
+    Returns:
+        float: The radius of the curve made by the 3 given waypoints
+    """
+
+    point1 = (loc1[0], loc1[1])
+    point2 = (loc2[0], loc2[1])
+    point3 = (loc3[0], loc3[1])
+
+    # Calculating length of all three sides
+    len_side_1 = round(math.dist(point1, point2), 3)
+    len_side_2 = round(math.dist(point2, point3), 3)
+    len_side_3 = round(math.dist(point1, point3), 3)
+    # sp is semi-perimeter
+    sp = (len_side_1 + len_side_2 + len_side_3) / 2
+
+    # Calculating area using Herons formula
+    area_squared = sp * (sp - len_side_1) * (sp - len_side_2) * (sp - len_side_3)
+    
+    # Calculating curvature using Menger curvature formula
+    radius = (len_side_1 * len_side_2 * len_side_3) / (4 * math.sqrt(area_squared))
+
+    return radius
+
+def findCorners(track: [roar_py_interface.RoarPyWaypoint]):
+    curAngle = track[0].roll_pitch_yaw[2]
+    angleDiffForCorner = 0.15
+    angleDiffForEnd = 0.075
+    # radForCorner = 100
+    isCorner = False
+    cornerStartIndex = None
+    corners = []
+
+    for i in range(len(track) + 5):        
+        farAngleDiff = abs(curAngle - track[(i + 8) % len(track)].roll_pitch_yaw[2])
+        shortAngleDiff = abs(curAngle - track[(i + 5) % len(track)].roll_pitch_yaw[2])
+        
+        if (farAngleDiff > angleDiffForCorner or (shortAngleDiff > angleDiffForCorner and farAngleDiff < angleDiffForEnd)) and not isCorner:
+            # cornerStart = track[i % len(track)]
+            cornerStartIndex = i + 2
+            isCorner = True
+        elif farAngleDiff < angleDiffForEnd and isCorner:
+            isCorner = False
+            if i - cornerStartIndex > 7:
+                # cornerEnd = track[(i + 4) % len(track)]
+                cornerInfo = {}
+                cornerInfo["startLoc"] = track[cornerStartIndex].location
+                cornerInfo["midLoc"] = track[cornerStartIndex + round((i - cornerStartIndex) * 0.4)].location
+                cornerInfo["endLoc"] = track[i].location
+                cornerInfo["radius"] = get_radius(cornerInfo["startLoc"], cornerInfo["midLoc"], cornerInfo["endLoc"])
+                corners.append(cornerInfo)
+        
+        curAngle = track[i % len(track)].roll_pitch_yaw[2]
+    return corners
 
 @atexit.register
 def saveDebugData():
@@ -88,7 +147,7 @@ class RoarCompetitionSolution:
         self.current_section = 0
         self.lapNum = 1
 
-    async def initialize(self) -> None:
+    async def initialize(self) -> None:      
         # NOTE waypoints are changed through this line
         self.maneuverable_waypoints = (
             roar_py_interface.RoarPyWaypoint.load_waypoint_list(
@@ -101,6 +160,10 @@ class RoarCompetitionSolution:
             self.section_indeces.append(
                 findClosestIndex(i, self.maneuverable_waypoints)
             )
+            
+        self.cornerInfo = findCorners(roar_py_interface.RoarPyWaypoint.load_waypoint_list(
+                np.load(f"{os.path.dirname(__file__)}\\waypoints\\monzaOriginalWaypoints.npz")
+            ))
 
         print(f"True total length: {len(self.maneuverable_waypoints) * 3}")
         print(f"1 lap length: {len(self.maneuverable_waypoints)}")
@@ -167,20 +230,21 @@ class RoarCompetitionSolution:
             vehicle_location,
             current_speed_kmh,
             self.current_section,
+            self.cornerInfo
         )
 
         steerMultiplier = round((current_speed_kmh + 0.001) / 120, 3)
 
-        if self.current_section in [3]:
-            steerMultiplier *= 0.9
-        if self.current_section == 4:
-            steerMultiplier = min(1.4, steerMultiplier * 1.6)
-        if self.current_section in [6]:
-            steerMultiplier = min(steerMultiplier * 5, 5.35)
-        if self.current_section == 7:
-            steerMultiplier *= 2
-        if self.current_section == 9:
-            steerMultiplier = max(steerMultiplier, 1.6)
+        # if self.current_section in [3]:
+        #     steerMultiplier *= 0.9
+        # if self.current_section == 4:
+        #     steerMultiplier = min(1.4, steerMultiplier * 1.6)
+        # if self.current_section in [6]:
+        #     steerMultiplier = min(steerMultiplier * 5, 5.35)
+        # if self.current_section == 7:
+        #     steerMultiplier *= 2
+        # if self.current_section == 9:
+        #     steerMultiplier = max(steerMultiplier, 1.6)
 
         control = {
             "throttle": np.clip(throttle, 0, 1),

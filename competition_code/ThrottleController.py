@@ -26,6 +26,7 @@ class ThrottleController:
         self.tick_counter = 0
         self.previous_speed = 1.0
         self.brake_ticks = 0
+        self.currentCorner = 0
 
         # for testing how fast the car stops
         self.brake_test_counter = 0
@@ -35,12 +36,19 @@ class ThrottleController:
         print("done")
 
     def run(
-        self, waypoints, current_location, current_speed, current_section
+        self, waypoints, current_location, current_speed, current_section, corners
     ) -> (float, float, int):
         self.tick_counter += 1
+        distanceToCorner = np.linalg.norm(current_location - corners[self.currentCorner]["startLoc"])
+        
+        if distanceToCorner < 3:
+            self.currentCorner = (self.currentCorner) % len(corners)
+            distanceToCorner = np.linalg.norm(current_location - corners[self.currentCorner]["startLoc"])
+        
         throttle, brake = self.get_throttle_and_brake(
-            current_location, current_speed, current_section, waypoints
+            current_location, current_speed, current_section, waypoints, corners[self.currentCorner], distanceToCorner
         )
+        
         # gear = max(1, (int)(math.log(current_speed + 0.00001, 5)))
         gear = max(1, int(current_speed / 60))
         if throttle < 0:
@@ -59,76 +67,16 @@ class ThrottleController:
         return throttle, brake, gear
 
     def get_throttle_and_brake(
-        self, current_location, current_speed, current_section, waypoints
+        self, current_location, current_speed, current_section, waypoints, corner, distanceToCorner
     ):
         """
         Returns throttle and brake values based off the car's current location and the radius of the approaching turn
         """
         
-        # TODO: Find a way to pre-calculate turn locations (start and end points) for more accurate values
-        nextWaypoint = self.get_next_interesting_waypoints(current_location, waypoints)
-        r1 = self.get_radius(nextWaypoint[self.close_index : self.close_index + 3])
-        r2 = self.get_radius(nextWaypoint[self.mid_index : self.mid_index + 3])
-        r3 = self.get_radius(nextWaypoint[self.far_index : self.far_index + 3])
+        targetSpeed = self.get_target_speed(corner["radius"], current_section)
+        speed_data = (self.speed_for_turn(distanceToCorner, targetSpeed, current_speed))
 
-        target_speed1 = self.get_target_speed(r1, current_section)
-        target_speed2 = self.get_target_speed(r2, current_section)
-        target_speed3 = self.get_target_speed(r3, current_section)
-
-        close_distance = self.target_distance[self.close_index] + 3
-        mid_distance = self.target_distance[self.mid_index]
-        far_distance = self.target_distance[self.far_index]
-        speed_data = []
-        speed_data.append(
-            self.speed_for_turn(close_distance, target_speed1, current_speed)
-        )
-        speed_data.append(
-            self.speed_for_turn(mid_distance, target_speed2, current_speed)
-        )
-        speed_data.append(
-            self.speed_for_turn(far_distance, target_speed3, current_speed)
-        )
-
-        if current_speed > 100:
-            # at high speed use larger spacing between points to look further ahead and detect wide turns.
-            if current_section != 9:
-                r4 = self.get_radius(
-                    [
-                        nextWaypoint[self.mid_index],
-                        nextWaypoint[self.mid_index + 2],
-                        nextWaypoint[self.mid_index + 4],
-                    ]
-                )
-                target_speed4 = self.get_target_speed(r4, current_section)
-                speed_data.append(
-                    self.speed_for_turn(close_distance, target_speed4, current_speed)
-                )
-
-            r5 = self.get_radius(
-                [
-                    nextWaypoint[self.close_index],
-                    nextWaypoint[self.close_index + 3],
-                    nextWaypoint[self.close_index + 6],
-                ]
-            )
-            target_speed5 = self.get_target_speed(r5, current_section)
-            speed_data.append(
-                self.speed_for_turn(close_distance, target_speed5, current_speed)
-            )
-
-        update = self.select_speed(speed_data)
-
-        self.print_speed(
-            " -- SPEED: ",
-            speed_data[0].recommended_speed_now,
-            speed_data[1].recommended_speed_now,
-            speed_data[2].recommended_speed_now,
-            (0 if len(speed_data) < 4 else speed_data[3].recommended_speed_now),
-            current_speed,
-        )
-
-        throttle, brake = self.speed_data_to_throttle_and_brake(update)
-        self.dprint("--- throt " + str(throttle) + " brake " + str(brake) + "---")
+        throttle, brake = self.speed_data_to_throttle_and_brake(speed_data)
         return throttle, brake
 
     def speed_data_to_throttle_and_brake(self, speed_data: SpeedData):
@@ -157,8 +105,8 @@ class ThrottleController:
 
         if percent_of_max > 1:
             # Consider slowing down
-            if speed_data.current_speed > 200:  # Brake earlier at higher speeds
-                brake_threshold_multiplier = 0.9
+            # if speed_data.current_speed > 200:  # Brake earlier at higher speeds
+            #     brake_threshold_multiplier = 0.9
 
             if percent_of_max > 1 + (
                 brake_threshold_multiplier * true_percent_change_per_tick
@@ -327,8 +275,8 @@ class ThrottleController:
         """
         # Takes in a target speed and distance and produces a speed that the car should target. Returns a SpeedData object
 
-        d = (1 / 675) * (target_speed**2) + distance
-        max_speed = math.sqrt(825 * d)
+        d = (1 / 1000) * (target_speed**2) + distance
+        max_speed = math.sqrt(400 * d)
         return SpeedData(distance, current_speed, target_speed, max_speed)
 
     def get_next_interesting_waypoints(self, current_location, more_waypoints):
@@ -372,67 +320,30 @@ class ThrottleController:
         self.dprint("wp dist " + str(dist))
         return points
 
-    def get_radius(self, wp: [roar_py_interface.RoarPyWaypoint]):
-        """Returns the radius of a curve given 3 waypoints using the Menger Curvature Formula
-
-        Args:
-            wp ([roar_py_interface.RoarPyWaypoint]): A list of 3 RoarPyWaypoints
-
-        Returns:
-            float: The radius of the curve made by the 3 given waypoints
-        """
-
-        point1 = (wp[0].location[0], wp[0].location[1])
-        point2 = (wp[1].location[0], wp[1].location[1])
-        point3 = (wp[2].location[0], wp[2].location[1])
-
-        # Calculating length of all three sides
-        len_side_1 = round(math.dist(point1, point2), 3)
-        len_side_2 = round(math.dist(point2, point3), 3)
-        len_side_3 = round(math.dist(point1, point3), 3)
-
-        small_num = 2
-
-        if len_side_1 < small_num or len_side_2 < small_num or len_side_3 < small_num:
-            return self.max_radius
-
-        # sp is semi-perimeter
-        sp = (len_side_1 + len_side_2 + len_side_3) / 2
-
-        # Calculating area using Herons formula
-        area_squared = sp * (sp - len_side_1) * (sp - len_side_2) * (sp - len_side_3)
-        if area_squared < small_num:
-            return self.max_radius
-
-        # Calculating curvature using Menger curvature formula
-        radius = (len_side_1 * len_side_2 * len_side_3) / (4 * math.sqrt(area_squared))
-
-        return radius
-
     def get_target_speed(self, radius: float, current_section: int):
         """Returns a target speed based on the radius of the turn and the section it is in
 
         Args:
-            radius (float): The calculated radius of the turn
+            radius (float): The radius of the turn
             current_section (int): The current section of the track the car is in
 
         Returns:
             float: The maximum speed the car can go around the corner at
         """
 
-        mu = 2.4
+        mu = 2
 
-        if radius >= self.max_radius:
-            return self.max_speed
+        # if radius >= self.max_radius:
+        #     return self.max_speed
 
-        if current_section == 2:
-            mu = 3.15
-        if current_section == 3:
-            mu = 3.15
-        if current_section == 6:
-            mu = 3.1
-        if current_section == 9:
-            mu = 2.2
+        # if current_section == 2:
+        #     mu = 3.15
+        # if current_section == 3:
+        #     mu = 3.15
+        # if current_section == 6:
+        #     mu = 3.1
+        # if current_section == 9:
+        #     mu = 2.2
 
         target_speed = math.sqrt(mu * 9.81 * radius) * 3.6
 
@@ -440,31 +351,31 @@ class ThrottleController:
             20, min(target_speed, self.max_speed)
         )  # clamp between 20 and max_speed
 
-    def print_speed(
-        self, text: str, s1: float, s2: float, s3: float, s4: float, curr_s: float
-    ):
-        """
-        Prints debug speed values
-        """
-        self.dprint(
-            text
-            + " s1= "
-            + str(round(s1, 2))
-            + " s2= "
-            + str(round(s2, 2))
-            + " s3= "
-            + str(round(s3, 2))
-            + " s4= "
-            + str(round(s4, 2))
-            + " cspeed= "
-            + str(round(curr_s, 2))
-        )
+    # def print_speed(
+    #     self, text: str, s1: float, s2: float, s3: float, s4: float, curr_s: float
+    # ):
+    #     """
+    #     Prints debug speed values
+    #     """
+    #     self.dprint(
+    #         text
+    #         + " s1= "
+    #         + str(round(s1, 2))
+    #         + " s2= "
+    #         + str(round(s2, 2))
+    #         + " s3= "
+    #         + str(round(s3, 2))
+    #         + " s4= "
+    #         + str(round(s4, 2))
+    #         + " cspeed= "
+    #         + str(round(curr_s, 2))
+    #     )
 
     # debug print
     def dprint(self, text):
         """
         Prints debug text
         """
-        if self.display_debug:
-            print(text)
-            self.debug_strings.append(text)
+        # if self.display_debug:
+        #     print(text)
+        #     self.debug_strings.append(text)

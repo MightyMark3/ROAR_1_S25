@@ -7,7 +7,7 @@ from progress.bar import IncrementalBar
 import transforms3d as tr3d
 import math
 
-def get_radius(wp: [roar_py_interface.RoarPyWaypoint]):
+def get_radius(loc1, loc2, loc3):
     """Returns the radius of a curve given 3 waypoints using the Menger Curvature Formula
 
     Args:
@@ -17,30 +17,65 @@ def get_radius(wp: [roar_py_interface.RoarPyWaypoint]):
         float: The radius of the curve made by the 3 given waypoints
     """
 
-    point1 = (wp[0].location[0], wp[0].location[1])
-    point2 = (wp[1].location[0], wp[1].location[1])
-    point3 = (wp[2].location[0], wp[2].location[1])
+    point1 = (loc1[0], loc1[1])
+    point2 = (loc2[0], loc2[1])
+    point3 = (loc3[0], loc3[1])
 
     # Calculating length of all three sides
     len_side_1 = round(math.dist(point1, point2), 3)
     len_side_2 = round(math.dist(point2, point3), 3)
     len_side_3 = round(math.dist(point1, point3), 3)
-
-    small_num = 5
-
-    if len_side_1 < small_num or len_side_2 < small_num or len_side_3 < small_num:
-        return 1000000
     # sp is semi-perimeter
     sp = (len_side_1 + len_side_2 + len_side_3) / 2
 
     # Calculating area using Herons formula
     area_squared = sp * (sp - len_side_1) * (sp - len_side_2) * (sp - len_side_3)
-    if area_squared < small_num:
-        return 1000000
+    
     # Calculating curvature using Menger curvature formula
     radius = (len_side_1 * len_side_2 * len_side_3) / (4 * math.sqrt(area_squared))
 
     return radius
+
+def findCorners(track: [roar_py_interface.RoarPyWaypoint]):
+    curAngle = track[0].roll_pitch_yaw[2]
+    angleDiffForCorner = 0.15
+    angleDiffForEnd = 0.075
+    radForCorner = 100
+    isCorner = False
+    cornerStartIndex = None
+
+    for i in range(len(track) + 5):
+        # smallRad = get_radius([track[i], track[(i + 4) % len(track)], track[(i + 8) % len(track)]])
+        # medRad = get_radius([track[i], track[(i + 8) % len(track)], track[(i + 16) % len(track)]])
+        # bigRad = get_radius([track[i], track[(i + 16) % len(track)], track[(i + 32) % len(track)]])
+        # curRad = min(smallRad, medRad, bigRad)
+        
+        # if curRad > radForCorner and curRad < 500000 and not isCorner:
+        #     cornerStart = track[i]
+        #     isCorner = True
+        # elif (curRad < radForCorner / 2 or curRad > 500000) and isCorner:
+        #     isCorner = False
+        #     cornerEnd = track[i]
+        #     corners.append([cornerStart, cornerEnd])
+        
+        farAngleDiff = abs(curAngle - track[(i + 8) % len(track)].roll_pitch_yaw[2])
+        shortAngleDiff = abs(curAngle - track[(i + 5) % len(track)].roll_pitch_yaw[2])
+        if (farAngleDiff > angleDiffForCorner or (shortAngleDiff > angleDiffForCorner and farAngleDiff < angleDiffForEnd)) and not isCorner:
+            cornerStart = track[i % len(track)]
+            cornerStartIndex = i + 2
+            isCorner = True
+        elif farAngleDiff < angleDiffForEnd and isCorner:
+            isCorner = False
+            if i - cornerStartIndex > 7:
+                cornerEnd = track[(i + 4) % len(track)]
+                cornerInfo = {}
+                cornerInfo["startLoc"] = track[cornerStartIndex].location
+                cornerInfo["midLoc"] = track[cornerStartIndex + round((i - cornerStartIndex) * 0.4)].location
+                cornerInfo["endLoc"] = track[i].location
+                cornerInfo["radius"] = get_radius(cornerInfo["startLoc"], cornerInfo["midLoc"], cornerInfo["endLoc"])
+                corners.append(cornerInfo)
+        curAngle = track[i % len(track)].roll_pitch_yaw[2]
+    return cornerInfo
 
 baseSection = []
 replacementSection = []
@@ -52,41 +87,10 @@ waypoints = roar_py_interface.RoarPyWaypoint.load_waypoint_list(
     np.load(f"{os.path.dirname(__file__)}\\waypoints\\waypointsPrimary.npz")
 )
 track = roar_py_interface.RoarPyWaypoint.load_waypoint_list(
-    np.load(f"{os.path.dirname(__file__)}\\waypoints\\Monza Original Waypoints.npz")
+    np.load(f"{os.path.dirname(__file__)}\\waypoints\\monzaOriginalWaypoints.npz")
 )
 
-curAngle = track[0].roll_pitch_yaw[2]
-angleDiffForCorner = 0.2
-radForCorner = 100
-isCorner = False
-cornerStartIndex = None
-
-for i in range(len(track) + 5):
-    # smallRad = get_radius([track[i], track[(i + 4) % len(track)], track[(i + 8) % len(track)]])
-    # medRad = get_radius([track[i], track[(i + 8) % len(track)], track[(i + 16) % len(track)]])
-    # bigRad = get_radius([track[i], track[(i + 16) % len(track)], track[(i + 32) % len(track)]])
-    # curRad = min(smallRad, medRad, bigRad)
-    
-    # if curRad > radForCorner and curRad < 500000 and not isCorner:
-    #     cornerStart = track[i]
-    #     isCorner = True
-    # elif (curRad < radForCorner / 2 or curRad > 500000) and isCorner:
-    #     isCorner = False
-    #     cornerEnd = track[i]
-    #     corners.append([cornerStart, cornerEnd])
-    
-    farAngleDiff = abs(curAngle - track[(i + 8) % len(track)].roll_pitch_yaw[2])
-    shortAngleDiff = abs(curAngle - track[(i + 4) % len(track)].roll_pitch_yaw[2])
-    if (farAngleDiff > angleDiffForCorner or (shortAngleDiff > angleDiffForCorner and farAngleDiff < 0.01)) and not isCorner:
-        cornerStart = track[i % len(track)]
-        cornerStartIndex = i
-        isCorner = True
-    elif farAngleDiff < 0.01 and isCorner:
-        isCorner = False
-        if i - cornerStartIndex > 10:
-            cornerEnd = track[(i + 5) % len(track)]
-            corners.append([cornerStart, cornerEnd])
-    curAngle = track[i % len(track)].roll_pitch_yaw[2]
+cornerInfo = findCorners(track)
 
 # print(corners)
 
@@ -120,11 +124,13 @@ for i in waypoints:
 
 # print(corners)
 for i in corners:
-    # Start of corner
-    plt.plot(i[0].location[0], i[0].location[1], "yo")
+    # plt.plot(i[0].location[0], i[0].location[1], "yo")
     
-    # End of corner
-    plt.plot(i[1].location[0], i[1].location[1], "go")
+    # plt.plot(i[1].location[0], i[1].location[1], "go")
+    
+    plt.plot(i["startLoc"][0], i["startLoc"][1], "yo")
+    plt.plot(i["midLoc"][0], i["midLoc"][1], "bo")
+    plt.plot(i["endLoc"][0], i["endLoc"][1], "go")
     progressBar.next()
 
 # for i in additionalWaypoints:
@@ -133,3 +139,5 @@ for i in corners:
 progressBar.finish()
 print()
 plt.show()
+
+print(cornerInfo)

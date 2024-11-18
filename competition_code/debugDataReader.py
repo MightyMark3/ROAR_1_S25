@@ -17,7 +17,7 @@ def distanceToWaypoint(currentWaypoint, firstWaypoint):
 print("\nLoading Waypoints\n")
 
 track = roar_py_interface.RoarPyWaypoint.load_waypoint_list(
-    np.load(f"{os.path.dirname(__file__)}\\waypoints\\Monza Original Waypoints.npz")
+    np.load(f"{os.path.dirname(__file__)}\\waypoints\\monzaOriginalWaypoints.npz")
 )
 
 totalPoints = len(data) + len(track)

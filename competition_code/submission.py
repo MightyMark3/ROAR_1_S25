@@ -18,7 +18,7 @@ import atexit
 # from scipy.interpolate import interp1d
 
 useDebug = True
-useDebugPrinting = True
+useDebugPrinting = False
 debugData = {}
 
 
@@ -233,7 +233,7 @@ class RoarCompetitionSolution:
             self.cornerInfo
         )
 
-        steerMultiplier = round((current_speed_kmh + 0.001) / 120, 3)
+        steerMultiplier = round(abs(current_speed_kmh) / 120, 3)
 
         # if self.current_section in [3]:
         #     steerMultiplier *= 0.9
@@ -241,6 +241,8 @@ class RoarCompetitionSolution:
         #     steerMultiplier = min(1.4, steerMultiplier * 1.6)
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
+        if self.current_section == 6:
+            steerMultiplier *= 2.6
         # if self.current_section == 7:
         #     steerMultiplier *= 2
         # if self.current_section == 9:
@@ -269,10 +271,10 @@ class RoarCompetitionSolution:
             debugData[self.num_ticks]["lap"] = self.lapNum
             
             # Print debug data
-            if useDebugPrinting and self.num_ticks % 5 == 0:
+            if useDebugPrinting and self.num_ticks % 2 == 0:
                 print(
-                    f"- Target waypoint: ({waypoint_to_follow.location[0]:.2f}, {waypoint_to_follow.location[1]:.2f}) index {nextWaypointIndex} \n\
-Current location: ({vehicle_location[0].item():.2f}, {vehicle_location[1].item():.2f}) index {self.current_waypoint_idx} section {self.current_section} \n\
+                    f"- Current location: ({vehicle_location[0].item():.2f}, {vehicle_location[1].item():.2f}) index {self.current_waypoint_idx} section {self.current_section} \n\
+Target waypoint: ({waypoint_to_follow.location[0]:.2f}, {waypoint_to_follow.location[1]:.2f}) index {nextWaypointIndex} \n\
 Distance to target waypoint: {math.sqrt((waypoint_to_follow.location[0] - vehicle_location[0].item()) ** 2 + (waypoint_to_follow.location[1] - vehicle_location[1].item()) ** 2):.3f}\n"
                 )
 
@@ -324,6 +326,10 @@ Steer: {control['steer']:.10f} \n"
         #       + " cur_ind " + str(self.current_waypoint_idx)
         #       + " num_points " + str(num_waypoints)
         #       + " index " + str((self.current_waypoint_idx + num_waypoints) % len(self.maneuverable_waypoints)) )
+        if self.current_section == 2:
+            return (self.current_waypoint_idx + 20) % len(
+                self.maneuverable_waypoints
+            )
         return (self.current_waypoint_idx + num_waypoints) % len(
             self.maneuverable_waypoints
         )
@@ -363,18 +369,18 @@ Steer: {control['steer']:.10f} \n"
         # Section specific tuning
         if self.current_section == 0:
             num_points = round(lookahead_value * 1.5)
-        if self.current_section == 4:
-            num_points = lookahead_value - 4
-        if self.current_section == 5:
-            num_points = round(lookahead_value * 1.35)
+        # if self.current_section == 4:
+        #     num_points = lookahead_value - 4
+        # if self.current_section == 5:
+        #     num_points = round(lookahead_value * 1.35)
         if self.current_section == 6:
             num_points = 4
-            next_waypoint_index = self.current_waypoint_idx + 21
-        if self.current_section == 7:
-            num_points = round(lookahead_value * 1.25)
-        if self.current_section == 9:
-            (self.current_waypoint_idx + 8) % len(self.maneuverable_waypoints)
-            num_points = 0
+            next_waypoint_index = self.current_waypoint_idx + 16
+        # if self.current_section == 7:
+        #     num_points = round(lookahead_value * 1.25)
+        # if self.current_section == 9:
+        #     (self.current_waypoint_idx + 8) % len(self.maneuverable_waypoints)
+        #     num_points = 0
 
         start_index_for_avg = (next_waypoint_index - (num_points // 2)) % len(
             self.maneuverable_waypoints

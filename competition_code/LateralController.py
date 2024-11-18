@@ -5,7 +5,6 @@ import math
 def normalize_rad(rad: float):
     return rad % (2 * np.pi)
 
-
 class LatController:
     def run(self, vehicle_location, vehicle_rotation, next_waypoint) -> float:
         """

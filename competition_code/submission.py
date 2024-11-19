@@ -152,7 +152,7 @@ class RoarCompetitionSolution:
         self.maneuverable_waypoints = (
             roar_py_interface.RoarPyWaypoint.load_waypoint_list(
                 np.load(f"{os.path.dirname(__file__)}\\waypoints\\waypointsPrimary.npz")
-            )[50:]
+            )[25:]
         )
 
         sectionLocations = [[-278, 372], [64, 890], [511, 1037], [762, 908], [198, 307], [-12, 38], [-85, -339], [-150, -1042], [-318, -991], [-352, -119]]
@@ -233,20 +233,22 @@ class RoarCompetitionSolution:
             self.cornerInfo
         )
 
-        steerMultiplier = round(abs(current_speed_kmh) / 120, 3)
-
-        if self.current_section in [3]:
-            steerMultiplier *= 1
-        # if self.current_section == 4:
-        #     steerMultiplier = min(1.4, steerMultiplier * 1.4)
+        steerMultiplier = round(abs(current_speed_kmh) / 110, 3)
+        
+        if self.current_section == 2:
+            steerMultiplier *= 1.4
+        # if self.current_section in [3]:
+        #     steerMultiplier *= 1
+        if self.current_section == 4:
+            steerMultiplier = min(1.4, steerMultiplier * 1.4)
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
         if self.current_section == 6:
-            steerMultiplier *= 2.6
+            steerMultiplier *= 2.5
         # if self.current_section == 7:
         #     steerMultiplier *= 2
         # if self.current_section == 9:
-        #     steerMultiplier = max(steerMultiplier, 1.6)
+        #     steerMultiplier = max(steerMultiplier, 1.1)
 
         control = {
             "throttle": np.clip(throttle, 0, 1),
@@ -326,10 +328,6 @@ Steer: {control['steer']:.10f} \n"
         #       + " cur_ind " + str(self.current_waypoint_idx)
         #       + " num_points " + str(num_waypoints)
         #       + " index " + str((self.current_waypoint_idx + num_waypoints) % len(self.maneuverable_waypoints)) )
-        if self.current_section == 2:
-            return (self.current_waypoint_idx + 20) % len(
-                self.maneuverable_waypoints
-            )
         return (self.current_waypoint_idx + num_waypoints) % len(
             self.maneuverable_waypoints
         )
@@ -362,28 +360,31 @@ Steer: {control['steer']:.10f} \n"
         """
         Returns a new averaged waypoint based on the location of a number of other waypoints
         """
-        next_waypoint_index = self.get_lookahead_index(current_speed)
+        # next_waypoint_index = self.get_lookahead_index(current_speed)
+        next_waypoint_index = (self.current_waypoint_idx + 16) % len(self.maneuverable_waypoints)
         lookahead_value = self.get_lookahead_value(current_speed)
         num_points = lookahead_value * 2
 
-        # Section specific tuning
-        if self.current_section == 0:
-            num_points = round(lookahead_value * 1.5)
-        if self.current_section == 3:
-            next_waypoint_index = self.current_waypoint_idx + 15
-        if self.current_section == 4:
-            # num_points = lookahead_value - 4
-            next_waypoint_index = self.current_waypoint_idx + 12
-        # if self.current_section == 5:
-        #     num_points = round(lookahead_value * 1.35)
-        if self.current_section == 6:
-            num_points = 4
-            next_waypoint_index = self.current_waypoint_idx + 16
-        # if self.current_section == 7:
-        #     num_points = round(lookahead_value * 1.25)
-        if self.current_section == 9:
-            (self.current_waypoint_idx + 14) % len(self.maneuverable_waypoints)
-            num_points = 0
+        # # Section specific tuning
+        # if self.current_section == 0:
+        #     num_points = round(lookahead_value * 1.5)
+        if self.current_section == 2:
+            next_waypoint_index = self.current_waypoint_idx + 20
+        # if self.current_section == 3:
+        #     next_waypoint_index = self.current_waypoint_idx + 15
+        # if self.current_section == 4:
+        #     # num_points = lookahead_value - 4
+        #     next_waypoint_index = self.current_waypoint_idx + 12
+        # # if self.current_section == 5:
+        # #     num_points = round(lookahead_value * 1.35)
+        if self.current_section in [6, 7]:
+            # num_points = 4
+            next_waypoint_index = self.current_waypoint_idx + 18
+        # # if self.current_section == 7:
+        # #     num_points = round(lookahead_value * 1.25)
+        if self.current_section in [9]:
+            next_waypoint_index = (self.current_waypoint_idx + 14) % len(self.maneuverable_waypoints)
+            num_points = 2
 
         start_index_for_avg = (next_waypoint_index - (num_points // 2)) % len(
             self.maneuverable_waypoints

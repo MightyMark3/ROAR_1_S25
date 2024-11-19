@@ -127,7 +127,7 @@ class ThrottleController:
         brakingDist = (
             (speed_data.recommended_speed_now / 3.6) ** 2
             - (speed_data.current_speed / 3.6) ** 2
-        ) / (-2 * speed_change_per_tick / 3.6) / 3.25
+        ) / (-2 * speed_change_per_tick / 3.6) / 3.35
         # print(f"\nBraking distance: {brakingDist:.2f}\nDistance to corner: {speed_data.distance_to_corner:.2f}\nRecommended speed: {speed_data.recommended_speed_now:.2f}\nTarget Speed: {speed_data.target_speed}")
 
         if brakingDist > speed_data.distance_to_corner:
@@ -146,7 +146,7 @@ class ThrottleController:
                     return -1, 1
 
                 # if speed is not decreasing fast, hit the brake.
-                if self.brake_ticks <= 0 and speed_change < 1.5:
+                if self.brake_ticks <= 0 and speed_change < 3:
                     # start braking, and set for how many ticks to brake
                     self.brake_ticks = (
                         round(
@@ -156,7 +156,7 @@ class ThrottleController:
                             )
                             / (speed_change_per_tick)
                         )
-                        + (speed_data.current_speed / 75) ** 2
+                        + 2
                     )
                     # self.brake_ticks = 1, or (1 or 2 but not more)
                     self.dprint(
@@ -212,7 +212,7 @@ class ThrottleController:
         else:
             self.brake_ticks = 0  # done slowing down. clear brake_ticks
             # Speed up
-            if speed_change >= 1.5:
+            if speed_change >= 2.75:
                 # speed is dropping fast, ok to throttle because the effect of throttle is delayed
                 self.dprint(
                     "tb: tick "
@@ -338,7 +338,7 @@ class ThrottleController:
             float: The maximum speed the car can go around the corner at
         """
         
-        mu = 2.5
+        mu = 3
 
         # if radius >= self.max_radius:
         #     return self.max_speed
@@ -348,11 +348,11 @@ class ThrottleController:
         # if current_section == 3:
         #     mu = 2
         if current_section in [4, 5]:
-            mu = 3
+            mu = 4.5
         if current_section == 6:
-            mu = 1.8
+            mu = 2.8
         if current_section == 9:
-            mu = 2.2
+            mu = 4.5
 
         target_speed = math.sqrt(mu * 9.81 * radius) * 3.6 
 

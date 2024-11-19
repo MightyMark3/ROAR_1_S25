@@ -244,7 +244,7 @@ class RoarCompetitionSolution:
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
         if self.current_section == 6:
-            steerMultiplier *= 2.5
+            steerMultiplier *= 2.25
         # if self.current_section == 7:
         #     steerMultiplier *= 2
         # if self.current_section == 9:

@@ -109,7 +109,7 @@ class ThrottleController:
         #             + " maxs= " + str(round(speed_data.recommended_speed_now, 2)) + " pcnt= " + str(round(percent_of_max, 2)))
         
         percent_of_max = speed_data.current_speed / speed_data.recommended_speed_now
-        speed_change_per_tick = 3.1  # Speed decrease in kph per tick
+        speed_change_per_tick = 2.5  # Speed decrease in kph per tick
         percent_change_per_tick = 0.075  # speed drop for one time-tick of braking
         true_percent_change_per_tick = round(
             speed_change_per_tick / (speed_data.current_speed + 0.001), 5
@@ -127,7 +127,7 @@ class ThrottleController:
         brakingDist = (
             (speed_data.recommended_speed_now / 3.6) ** 2
             - (speed_data.current_speed / 3.6) ** 2
-        ) / (-2 * speed_change_per_tick / 3.6) / 3.35
+        ) / (-2 * speed_change_per_tick / 3.6) / 3.5
         # print(f"\nBraking distance: {brakingDist:.2f}\nDistance to corner: {speed_data.distance_to_corner:.2f}\nRecommended speed: {speed_data.recommended_speed_now:.2f}\nTarget Speed: {speed_data.target_speed}")
 
         if brakingDist > speed_data.distance_to_corner:

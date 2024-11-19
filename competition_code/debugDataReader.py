@@ -8,6 +8,8 @@ import transforms3d as tr3d
 
 data = json.load(open(f"{os.path.dirname(__file__)}\\debugData\\debugData.json"))
 lapMarkers = [".", "^", "s"]
+totalSpeedChangeWhileBraking = 0
+numBrakeVals = 0
 
 
 def distanceToWaypoint(currentWaypoint, firstWaypoint):
@@ -51,15 +53,20 @@ for i in data:
 
     if brakeVal > 0:
         color = (brakeVal ** 2, 0, 0)
+        totalSpeedChangeWhileBraking += prevData["speed"] - data[i]["speed"]
+        numBrakeVals += 1
     else:
         color = (0, throttleVal ** 2, 0)
 
     x = data[i]["loc"][0]
     y = data[i]["loc"][1]
+    
+    prevData = data[i]
 
     plt.plot(x, y, lapMarkers[data[i]["lap"] - 1], color=color)
     progressBar.next()
 
 progressBar.finish()
 print()
+print(f"Average speed change while braking: {totalSpeedChangeWhileBraking / numBrakeVals}\n")
 plt.show()

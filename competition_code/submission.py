@@ -235,10 +235,10 @@ class RoarCompetitionSolution:
 
         steerMultiplier = round(abs(current_speed_kmh) / 120, 3)
 
-        # if self.current_section in [3]:
-        #     steerMultiplier *= 0.9
+        if self.current_section in [3]:
+            steerMultiplier *= 1
         # if self.current_section == 4:
-        #     steerMultiplier = min(1.4, steerMultiplier * 1.6)
+        #     steerMultiplier = min(1.4, steerMultiplier * 1.4)
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
         if self.current_section == 6:
@@ -369,8 +369,11 @@ Steer: {control['steer']:.10f} \n"
         # Section specific tuning
         if self.current_section == 0:
             num_points = round(lookahead_value * 1.5)
-        # if self.current_section == 4:
-        #     num_points = lookahead_value - 4
+        if self.current_section == 3:
+            next_waypoint_index = self.current_waypoint_idx + 15
+        if self.current_section == 4:
+            # num_points = lookahead_value - 4
+            next_waypoint_index = self.current_waypoint_idx + 12
         # if self.current_section == 5:
         #     num_points = round(lookahead_value * 1.35)
         if self.current_section == 6:
@@ -378,9 +381,9 @@ Steer: {control['steer']:.10f} \n"
             next_waypoint_index = self.current_waypoint_idx + 16
         # if self.current_section == 7:
         #     num_points = round(lookahead_value * 1.25)
-        # if self.current_section == 9:
-        #     (self.current_waypoint_idx + 8) % len(self.maneuverable_waypoints)
-        #     num_points = 0
+        if self.current_section == 9:
+            (self.current_waypoint_idx + 14) % len(self.maneuverable_waypoints)
+            num_points = 0
 
         start_index_for_avg = (next_waypoint_index - (num_points // 2)) % len(
             self.maneuverable_waypoints

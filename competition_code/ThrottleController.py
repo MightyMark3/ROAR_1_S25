@@ -104,14 +104,12 @@ class ThrottleController:
             tuple: throttle, brake
         """
         
-        # TODO: Use (Vf^2-Vo^2) / 2a = dX
-
         # self.dprint("dist=" + str(round(speed_data.distance_to_section)) + " cs=" + str(round(speed_data.current_speed, 2))
         #             + " ts= " + str(round(speed_data.target_speed_at_distance, 2))
         #             + " maxs= " + str(round(speed_data.recommended_speed_now, 2)) + " pcnt= " + str(round(percent_of_max, 2)))
-
+        
         percent_of_max = speed_data.current_speed / speed_data.recommended_speed_now
-        speed_change_per_tick = 3  # Speed decrease in kph per tick
+        speed_change_per_tick = 3.1  # Speed decrease in kph per tick
         percent_change_per_tick = 0.075  # speed drop for one time-tick of braking
         true_percent_change_per_tick = round(
             speed_change_per_tick / (speed_data.current_speed + 0.001), 5
@@ -129,7 +127,7 @@ class ThrottleController:
         brakingDist = (
             (speed_data.recommended_speed_now / 3.6) ** 2
             - (speed_data.current_speed / 3.6) ** 2
-        ) / (-2 * speed_change_per_tick / 3.6) / 2
+        ) / (-2 * speed_change_per_tick / 3.6) / 3.25
         # print(f"\nBraking distance: {brakingDist:.2f}\nDistance to corner: {speed_data.distance_to_corner:.2f}\nRecommended speed: {speed_data.recommended_speed_now:.2f}\nTarget Speed: {speed_data.target_speed}")
 
         if brakingDist > speed_data.distance_to_corner:
@@ -137,7 +135,7 @@ class ThrottleController:
             # if speed_data.current_speed > 200:  # Brake earlier at higher speeds
             #     brake_threshold_multiplier = 0.9
 
-            if speed_data.current_speed > speed_data.recommended_speed_now:
+            if speed_data.current_speed > speed_data.target_speed:
                 if self.brake_ticks > 0:
                     self.dprint(
                         "tb: tick "
@@ -154,11 +152,11 @@ class ThrottleController:
                         round(
                             (
                                 speed_data.current_speed
-                                - speed_data.recommended_speed_now
+                                - speed_data.target_speed
                             )
-                            / (speed_change_per_tick / 1.5)
+                            / (speed_change_per_tick)
                         )
-                        + 2
+                        + (speed_data.current_speed / 75) ** 2
                     )
                     # self.brake_ticks = 1, or (1 or 2 but not more)
                     self.dprint(
@@ -191,7 +189,6 @@ class ThrottleController:
                     self.brake_ticks = 0  # done slowing down. clear brake_ticks
                     return 1, 0
 
-                # TODO: Try to get rid of coasting. Unnecessary idle time that could be spent speeding up or slowing down
                 throttle_to_maintain = self.get_throttle_to_maintain_speed(
                     speed_data.current_speed
                 )
@@ -340,7 +337,7 @@ class ThrottleController:
         Returns:
             float: The maximum speed the car can go around the corner at
         """
-
+        
         mu = 2.5
 
         # if radius >= self.max_radius:
@@ -348,12 +345,14 @@ class ThrottleController:
 
         # if current_section == 2:
         #     mu = 3.15
-        if current_section == 3:
-            mu = 1.9
+        # if current_section == 3:
+        #     mu = 2
+        if current_section in [4, 5]:
+            mu = 3
         if current_section == 6:
             mu = 1.8
-        # if current_section == 9:
-        #     mu = 2.2
+        if current_section == 9:
+            mu = 2.2
 
         target_speed = math.sqrt(mu * 9.81 * radius) * 3.6 
 

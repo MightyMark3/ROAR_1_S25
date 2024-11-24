@@ -135,7 +135,7 @@ class ThrottleController:
             # if speed_data.current_speed > 200:  # Brake earlier at higher speeds
             #     brake_threshold_multiplier = 0.9
 
-            if speed_data.current_speed > speed_data.target_speed:
+            if speed_data.current_speed > speed_data.recommended_speed_now:
                 if self.brake_ticks > 0:
                     self.dprint(
                         "tb: tick "
@@ -146,17 +146,16 @@ class ThrottleController:
                     return -1, 1
 
                 # if speed is not decreasing fast, hit the brake.
-                if self.brake_ticks <= 0 and speed_change < 3:
+                if self.brake_ticks <= 0:
                     # start braking, and set for how many ticks to brake
                     self.brake_ticks = (
                         round(
                             (
                                 speed_data.current_speed
-                                - speed_data.target_speed
+                                - speed_data.recommended_speed_now
                             )
                             / (speed_change_per_tick)
                         )
-                        + 2
                     )
                     # self.brake_ticks = 1, or (1 or 2 but not more)
                     self.dprint(
@@ -343,16 +342,16 @@ class ThrottleController:
         # if radius >= self.max_radius:
         #     return self.max_speed
 
-        # if current_section == 2:
-        #     mu = 3.15
-        # if current_section == 3:
-        #     mu = 2
+        if current_section == 2:
+            mu = 3.15
+        if current_section == 3:
+            mu = 3.75
         if current_section in [4, 5]:
-            mu = 4.5
+            mu = 5.5
         if current_section == 6:
-            mu = 2.8
+            mu = 2.75
         if current_section == 9:
-            mu = 4.5
+            mu = 4.4
 
         target_speed = math.sqrt(mu * 9.81 * radius) * 3.6 
 

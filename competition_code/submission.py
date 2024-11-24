@@ -62,17 +62,18 @@ def get_radius(loc1, loc2, loc3):
     point3 = (loc3[0], loc3[1])
 
     # Calculating length of all three sides
-    len_side_1 = round(math.dist(point1, point2), 3)
-    len_side_2 = round(math.dist(point2, point3), 3)
-    len_side_3 = round(math.dist(point1, point3), 3)
+    side1 = round(math.dist(point1, point2), 3)
+    side2 = round(math.dist(point2, point3), 3)
+    side3 = round(math.dist(point1, point3), 3)
+    
     # sp is semi-perimeter
-    sp = (len_side_1 + len_side_2 + len_side_3) / 2
+    sp = (side1 + side2 + side3) / 2
 
     # Calculating area using Herons formula
-    area_squared = sp * (sp - len_side_1) * (sp - len_side_2) * (sp - len_side_3)
+    area_squared = sp * (sp - side1) * (sp - side2) * (sp - side3)
     
     # Calculating curvature using Menger curvature formula
-    radius = (len_side_1 * len_side_2 * len_side_3) / (4 * math.sqrt(area_squared))
+    radius = (side1 * side2 * side3) / (4 * math.sqrt(area_squared))
 
     return radius
 
@@ -152,7 +153,7 @@ class RoarCompetitionSolution:
         self.maneuverable_waypoints = (
             roar_py_interface.RoarPyWaypoint.load_waypoint_list(
                 np.load(f"{os.path.dirname(__file__)}\\waypoints\\waypointsPrimary.npz")
-            )[25:]
+            )[20:]
         )
 
         sectionLocations = [[-278, 372], [64, 890], [511, 1037], [762, 908], [198, 307], [-12, 38], [-85, -339], [-150, -1042], [-318, -991], [-352, -119]]
@@ -244,7 +245,7 @@ class RoarCompetitionSolution:
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
         if self.current_section == 6:
-            steerMultiplier *= 2.25
+            steerMultiplier *= 2.75
         # if self.current_section == 7:
         #     steerMultiplier *= 2
         # if self.current_section == 9:
@@ -370,20 +371,22 @@ Steer: {control['steer']:.10f} \n"
         #     num_points = round(lookahead_value * 1.5)
         if self.current_section == 2:
             next_waypoint_index = self.current_waypoint_idx + 20
-        # if self.current_section == 3:
-        #     next_waypoint_index = self.current_waypoint_idx + 15
+        if self.current_section == 3:
+            next_waypoint_index = self.current_waypoint_idx + 18
         # if self.current_section == 4:
         #     # num_points = lookahead_value - 4
         #     next_waypoint_index = self.current_waypoint_idx + 12
         # # if self.current_section == 5:
         # #     num_points = round(lookahead_value * 1.35)
-        if self.current_section in [6, 7]:
+        if self.current_section == 6:
             # num_points = 4
+            next_waypoint_index = self.current_waypoint_idx + 18
+        if self.current_section == 7:
             next_waypoint_index = self.current_waypoint_idx + 18
         # # if self.current_section == 7:
         # #     num_points = round(lookahead_value * 1.25)
         if self.current_section in [9]:
-            next_waypoint_index = (self.current_waypoint_idx + 14) % len(self.maneuverable_waypoints)
+            next_waypoint_index = (self.current_waypoint_idx + 16) % len(self.maneuverable_waypoints)
             num_points = 2
 
         start_index_for_avg = (next_waypoint_index - (num_points // 2)) % len(

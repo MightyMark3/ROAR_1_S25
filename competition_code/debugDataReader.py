@@ -7,7 +7,7 @@ from progress.bar import IncrementalBar
 import transforms3d as tr3d
 
 data = json.load(open(f"{os.path.dirname(__file__)}\\debugData\\debugData.json"))
-lapMarkers = [".", "^", "s"]
+lapMarkers = ["^", ".", "s"]
 totalSpeedChangeWhileBraking = 0
 numBrakeVals = 0
 
@@ -62,8 +62,9 @@ for i in data:
     y = data[i]["loc"][1]
     
     prevData = data[i]
-
-    plt.plot(x, y, lapMarkers[data[i]["lap"] - 1], color=color)
+    
+    if data[i]["lap"] == 2:
+        plt.plot(x, y, lapMarkers[data[i]["lap"] - 1], color=color)
     progressBar.next()
 
 progressBar.finish()

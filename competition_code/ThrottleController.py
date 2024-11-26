@@ -109,7 +109,7 @@ class ThrottleController:
         #             + " maxs= " + str(round(speed_data.recommended_speed_now, 2)) + " pcnt= " + str(round(percent_of_max, 2)))
         
         percent_of_max = speed_data.current_speed / speed_data.recommended_speed_now
-        speed_change_per_tick = 2.4  # Speed decrease in kph per tick
+        speed_change_per_tick = 2.25  # Speed decrease in kph per tick
         percent_change_per_tick = 0.075  # speed drop for one time-tick of braking
         true_percent_change_per_tick = round(
             speed_change_per_tick / (speed_data.current_speed + 0.001), 5
@@ -337,7 +337,7 @@ class ThrottleController:
             float: The maximum speed the car can go around the corner at
         """
         
-        mu = 3.2
+        mu = 3.35
 
         # if radius >= self.max_radius:
         #     return self.max_speed
@@ -347,11 +347,11 @@ class ThrottleController:
         if current_section == 3:
             mu = 4
         if current_section in [4, 5]:
-            mu = 6.5
+            mu = 6.65
         if current_section == 6:
             mu = 2.8
         if current_section == 9:
-            mu = 4.25
+            mu = 4.35
         if current_section == 10:
             mu = 2.5
 

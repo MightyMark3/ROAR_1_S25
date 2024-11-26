@@ -236,16 +236,19 @@ class RoarCompetitionSolution:
 
         steerMultiplier = round(abs(current_speed_kmh) / 110, 3)
         
+        if self.current_section == 1:
+            steerMultiplier *= 1.25
         if self.current_section == 2:
             steerMultiplier *= 1.6
         # if self.current_section in [3]:
         #     steerMultiplier *= 1
         if self.current_section == 4:
-            steerMultiplier = max(1.3, steerMultiplier * 1.4)
+            steerMultiplier = max(1.2, steerMultiplier * 1.3)
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
         if self.current_section == 6:
             steerMultiplier = np.clip(steerMultiplier * 2.75, 3.75, 4.25)
+            # steerMultiplier = 1.5
         # if self.current_section == 7:
         #     steerMultiplier *= 2
         if self.current_section in [9]:
@@ -373,9 +376,9 @@ Steer: {control['steer']:.10f} \n"
         # if self.current_section == 0:
         #     num_points = round(lookahead_value * 1.5)
         if self.current_section == 1:
-            next_waypoint_index = self.current_waypoint_idx + 16
+            next_waypoint_index = self.current_waypoint_idx + 14
         if self.current_section == 2:
-            next_waypoint_index = self.current_waypoint_idx + 20
+            next_waypoint_index = self.current_waypoint_idx + 22
         # if self.current_section == 3:
         #     next_waypoint_index = self.current_waypoint_idx + 18
         if self.current_section == 4:
@@ -383,8 +386,8 @@ Steer: {control['steer']:.10f} \n"
             next_waypoint_index = self.current_waypoint_idx + 16
         if self.current_section == 5:
             num_points = round(lookahead_value * 1.35)
-        if self.current_section == 6:
-            num_points = 4
+        # if self.current_section == 6:
+        #     num_points = 4
         #     next_waypoint_index = self.current_waypoint_idx + 18
         # if self.current_section == 7:
         #     next_waypoint_index = self.current_waypoint_idx + 18

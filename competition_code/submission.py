@@ -240,8 +240,8 @@ class RoarCompetitionSolution:
             steerMultiplier *= 1.25
         if self.current_section == 2:
             steerMultiplier *= 1.6
-        # if self.current_section in [3]:
-        #     steerMultiplier *= 1
+        if self.current_section in [3]:
+            steerMultiplier *= np.clip(steerMultiplier * 1.75, 1.6, 2.75)
         if self.current_section == 4:
             steerMultiplier = max(1.2, steerMultiplier * 1.3)
         # if self.current_section in [6]:
@@ -379,8 +379,8 @@ Steer: {control['steer']:.10f} \n"
             next_waypoint_index = self.current_waypoint_idx + 14
         if self.current_section == 2:
             next_waypoint_index = self.current_waypoint_idx + 22
-        # if self.current_section == 3:
-        #     next_waypoint_index = self.current_waypoint_idx + 18
+        if self.current_section == 3:
+            next_waypoint_index = self.current_waypoint_idx + 20
         if self.current_section == 4:
             # num_points = lookahead_value - 4
             next_waypoint_index = self.current_waypoint_idx + 16

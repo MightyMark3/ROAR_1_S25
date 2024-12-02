@@ -262,18 +262,18 @@ class RoarCompetitionSolution:
 
         steerMultiplier = round(abs(current_speed_kmh) / 110, 3)
 
-        # if self.current_section == 1:
-        #     steerMultiplier *= 1.6
+        if self.current_section == 1:
+            steerMultiplier *= 1.15
         if self.current_section == 2:
             steerMultiplier *= 1.6
         if self.current_section in [3]:
             steerMultiplier = np.clip(steerMultiplier * 2.25, 2.75, 3.5)
         if self.current_section == 4:
-            steerMultiplier = np.clip(steerMultiplier * 1.4, 1.65, 2.5)
+            steerMultiplier = np.clip(steerMultiplier * 1.4, 2, 3)
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
         if self.current_section == 6:
-            steerMultiplier = np.clip(steerMultiplier * 2.75, 4.25, 5)
+            steerMultiplier = np.clip(steerMultiplier * 5.25, 5.25, 7)
             # steerMultiplier = 1.5
         # if self.current_section == 7:
         #     steerMultiplier *= 2
@@ -409,7 +409,7 @@ Steer: {control['steer']:.10f} \n"
         if self.current_section == 2:
             next_waypoint_index = self.current_waypoint_idx + 22
         if self.current_section == 3:
-            next_waypoint_index = self.current_waypoint_idx + 20
+            next_waypoint_index = self.current_waypoint_idx + 21
         if self.current_section == 4:
             num_points = lookahead_value - 4
             next_waypoint_index = self.current_waypoint_idx + 22
@@ -417,7 +417,7 @@ Steer: {control['steer']:.10f} \n"
             num_points = round(lookahead_value * 1.35)
         if self.current_section == 6:
             num_points = 4
-            next_waypoint_index = self.current_waypoint_idx + 20
+            next_waypoint_index = self.current_waypoint_idx + 26
         # if self.current_section == 7:
         #     next_waypoint_index = self.current_waypoint_idx + 18
         # # if self.current_section == 7:

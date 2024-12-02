@@ -15,7 +15,7 @@ waypoints = roar_py_interface.RoarPyWaypoint.load_waypoint_list(
     np.load(f"{os.path.dirname(__file__)}\\waypoints\\waypointsPrimary.npz")
 )
 track = roar_py_interface.RoarPyWaypoint.load_waypoint_list(
-    np.load(f"{os.path.dirname(__file__)}\\waypoints\\Monza Original Waypoints.npz")
+    np.load(f"{os.path.dirname(__file__)}\\waypoints\\monzaOriginalWaypoints.npz")
 )
 
 totalPoints = len(waypoints) + len(track)

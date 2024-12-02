@@ -47,6 +47,7 @@ def findClosestIndex(location, waypoints: List[roar_py_interface.RoarPyWaypoint]
             closestInd = i
     return closestInd % len(waypoints)
 
+
 def get_radius(loc1, loc2, loc3):
     """Returns the radius of a curve given 3 waypoints using the Menger Curvature Formula
 
@@ -65,17 +66,18 @@ def get_radius(loc1, loc2, loc3):
     side1 = round(math.dist(point1, point2), 3)
     side2 = round(math.dist(point2, point3), 3)
     side3 = round(math.dist(point1, point3), 3)
-    
+
     # sp is semi-perimeter
     sp = (side1 + side2 + side3) / 2
 
     # Calculating area using Herons formula
     area_squared = sp * (sp - side1) * (sp - side2) * (sp - side3)
-    
+
     # Calculating curvature using Menger curvature formula
     radius = (side1 * side2 * side3) / (4 * math.sqrt(area_squared))
 
     return radius
+
 
 def findCorners(track: [roar_py_interface.RoarPyWaypoint]):
     curAngle = track[0].roll_pitch_yaw[2]
@@ -86,11 +88,14 @@ def findCorners(track: [roar_py_interface.RoarPyWaypoint]):
     cornerStartIndex = None
     corners = []
 
-    for i in range(len(track) + 5):        
+    for i in range(len(track) + 5):
         farAngleDiff = abs(curAngle - track[(i + 8) % len(track)].roll_pitch_yaw[2])
         shortAngleDiff = abs(curAngle - track[(i + 5) % len(track)].roll_pitch_yaw[2])
-        
-        if (farAngleDiff > angleDiffForCorner or (shortAngleDiff > angleDiffForCorner and farAngleDiff < angleDiffForEnd)) and not isCorner:
+
+        if (
+            farAngleDiff > angleDiffForCorner
+            or (shortAngleDiff > angleDiffForCorner and farAngleDiff < angleDiffForEnd)
+        ) and not isCorner:
             # cornerStart = track[i % len(track)]
             cornerStartIndex = i + 2
             isCorner = True
@@ -100,13 +105,18 @@ def findCorners(track: [roar_py_interface.RoarPyWaypoint]):
                 # cornerEnd = track[(i + 4) % len(track)]
                 cornerInfo = {}
                 cornerInfo["startLoc"] = track[cornerStartIndex].location
-                cornerInfo["midLoc"] = track[cornerStartIndex + round((i - cornerStartIndex) * 0.4)].location
+                cornerInfo["midLoc"] = track[
+                    cornerStartIndex + round((i - cornerStartIndex) * 0.4)
+                ].location
                 cornerInfo["endLoc"] = track[i].location
-                cornerInfo["radius"] = get_radius(cornerInfo["startLoc"], cornerInfo["midLoc"], cornerInfo["endLoc"])
+                cornerInfo["radius"] = get_radius(
+                    cornerInfo["startLoc"], cornerInfo["midLoc"], cornerInfo["endLoc"]
+                )
                 corners.append(cornerInfo)
-        
+
         curAngle = track[i % len(track)].roll_pitch_yaw[2]
     return corners
+
 
 @atexit.register
 def saveDebugData():
@@ -148,7 +158,7 @@ class RoarCompetitionSolution:
         self.current_section = 0
         self.lapNum = 1
 
-    async def initialize(self) -> None:      
+    async def initialize(self) -> None:
         # NOTE waypoints are changed through this line
         self.maneuverable_waypoints = (
             roar_py_interface.RoarPyWaypoint.load_waypoint_list(
@@ -156,15 +166,31 @@ class RoarCompetitionSolution:
             )[25:]
         )
 
-        sectionLocations = [[-278, 372], [64, 890], [511, 1037], [762, 908], [198, 307], [-12, 38], [-85, -339], [-150, -1042], [-318, -991], [-352, -119], [-300, 330]]
+        sectionLocations = [
+            [-278, 372],
+            [64, 890],
+            [511, 1037],
+            [762, 908],
+            [198, 307],
+            [-11, 60],
+            [-85, -339],
+            [-150, -1042],
+            [-318, -991],
+            [-352, -119],
+            [-300, 330],
+        ]
         for i in sectionLocations:
             self.section_indeces.append(
                 findClosestIndex(i, self.maneuverable_waypoints)
             )
-            
-        self.cornerInfo = findCorners(roar_py_interface.RoarPyWaypoint.load_waypoint_list(
-                np.load(f"{os.path.dirname(__file__)}\\waypoints\\monzaOriginalWaypoints.npz")
-            ))
+
+        self.cornerInfo = findCorners(
+            roar_py_interface.RoarPyWaypoint.load_waypoint_list(
+                np.load(
+                    f"{os.path.dirname(__file__)}\\waypoints\\monzaOriginalWaypoints.npz"
+                )
+            )
+        )
 
         print(f"True total length: {len(self.maneuverable_waypoints) * 3}")
         print(f"1 lap length: {len(self.maneuverable_waypoints)}")
@@ -231,28 +257,28 @@ class RoarCompetitionSolution:
             vehicle_location,
             current_speed_kmh,
             self.current_section,
-            self.cornerInfo
+            self.cornerInfo,
         )
 
         steerMultiplier = round(abs(current_speed_kmh) / 110, 3)
-        
-        if self.current_section == 1:
-            steerMultiplier *= 1.25
+
+        # if self.current_section == 1:
+        #     steerMultiplier *= 1.6
         if self.current_section == 2:
             steerMultiplier *= 1.6
         if self.current_section in [3]:
-            steerMultiplier *= np.clip(steerMultiplier * 1.75, 1.6, 2.75)
+            steerMultiplier = np.clip(steerMultiplier * 2.25, 2.75, 3.5)
         if self.current_section == 4:
-            steerMultiplier = max(1.2, steerMultiplier * 1.3)
+            steerMultiplier = np.clip(steerMultiplier * 1.4, 1.65, 2.5)
         # if self.current_section in [6]:
         #     steerMultiplier = min(steerMultiplier * 5, 5.35)
         if self.current_section == 6:
-            steerMultiplier = np.clip(steerMultiplier * 2.75, 3.75, 4.25)
+            steerMultiplier = np.clip(steerMultiplier * 2.75, 4.25, 5)
             # steerMultiplier = 1.5
         # if self.current_section == 7:
         #     steerMultiplier *= 2
         if self.current_section in [9]:
-            steerMultiplier = max(steerMultiplier, 1.1)        
+            steerMultiplier = max(steerMultiplier, 1.1)
         # if self.current_section in [10]:
         #     # steerMultiplier = max(steerMultiplier, 1.6)
         #     steerMultiplier *= 1.2
@@ -265,7 +291,7 @@ class RoarCompetitionSolution:
             "reverse": 0,
             "target_gear": gear,  # Gears do not appear to have an impact on speed
         }
-        
+
         # Store debug data for later use
         if useDebug:
             debugData[self.num_ticks] = {}
@@ -278,7 +304,7 @@ class RoarCompetitionSolution:
             debugData[self.num_ticks]["steer"] = round(float(control["steer"]), 10)
             debugData[self.num_ticks]["speed"] = round(current_speed_kmh, 3)
             debugData[self.num_ticks]["lap"] = self.lapNum
-            
+
             # Print debug data
             if useDebugPrinting and self.num_ticks % 2 == 0:
                 print(
@@ -338,12 +364,12 @@ Steer: {control['steer']:.10f} \n"
         return (self.current_waypoint_idx + num_waypoints) % len(
             self.maneuverable_waypoints
         )
-    
+
     # Old code (used with PID)
     # def get_lateral_pid_config(self):
     #     """
     #     Returns the PID values for the lateral (steering) PID
-    #     """   
+    #     """
     #     with open(
     #         f"{os.path.dirname(__file__)}\\configs\\LatPIDConfig.json", "r"
     #     ) as file:
@@ -368,7 +394,9 @@ Steer: {control['steer']:.10f} \n"
         Returns a new averaged waypoint based on the location of a number of other waypoints
         """
         # next_waypoint_index = self.get_lookahead_index(current_speed)
-        next_waypoint_index = (self.current_waypoint_idx + 18) % len(self.maneuverable_waypoints)
+        next_waypoint_index = (self.current_waypoint_idx + 18) % len(
+            self.maneuverable_waypoints
+        )
         lookahead_value = self.get_lookahead_value(current_speed)
         num_points = lookahead_value * 2
 
@@ -376,28 +404,33 @@ Steer: {control['steer']:.10f} \n"
         # if self.current_section == 0:
         #     num_points = round(lookahead_value * 1.5)
         if self.current_section == 1:
-            next_waypoint_index = self.current_waypoint_idx + 14
+            # next_waypoint_index = self.current_waypoint_idx + 14
+            next_waypoint_index = self.get_lookahead_index(current_speed)
         if self.current_section == 2:
             next_waypoint_index = self.current_waypoint_idx + 22
         if self.current_section == 3:
             next_waypoint_index = self.current_waypoint_idx + 20
         if self.current_section == 4:
-            # num_points = lookahead_value - 4
-            next_waypoint_index = self.current_waypoint_idx + 16
+            num_points = lookahead_value - 4
+            next_waypoint_index = self.current_waypoint_idx + 22
         if self.current_section == 5:
             num_points = round(lookahead_value * 1.35)
-        # if self.current_section == 6:
-        #     num_points = 4
-        #     next_waypoint_index = self.current_waypoint_idx + 18
+        if self.current_section == 6:
+            num_points = 4
+            next_waypoint_index = self.current_waypoint_idx + 20
         # if self.current_section == 7:
         #     next_waypoint_index = self.current_waypoint_idx + 18
         # # if self.current_section == 7:
         # #     num_points = round(lookahead_value * 1.25)
         if self.current_section in [9]:
-            next_waypoint_index = (self.current_waypoint_idx + 14) % len(self.maneuverable_waypoints)
+            next_waypoint_index = (self.current_waypoint_idx + 14) % len(
+                self.maneuverable_waypoints
+            )
             num_points = 2
         if self.current_section == 10:
-            next_waypoint_index = (self.current_waypoint_idx + 12) % len(self.maneuverable_waypoints)
+            next_waypoint_index = (self.current_waypoint_idx + 12) % len(
+                self.maneuverable_waypoints
+            )
             num_points = 2
 
         start_index_for_avg = (next_waypoint_index - (num_points // 2)) % len(

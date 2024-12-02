@@ -305,11 +305,12 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        numRuns = int(
-            input("Please enter the number of runs you would like to perform: ")
+        numRuns = abs(int(
+            input("Please enter the number of runs you would like to perform: "))
         )
     except:
-        print("That is not a valid input")
+        print("Invalid input detected. Defaulting to 1 run.")
+        numRuns = 1
 
     lapTimes = []
     lapTimeTotal = 0

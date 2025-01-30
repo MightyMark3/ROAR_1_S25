@@ -56,37 +56,53 @@ if use2D:
         throttleVal = data[i]["throttle"]
 
         if brakeVal > 0:
-            colorVal = (brakeVal ** 2, 0, 0)
+            colorVal = (brakeVal**2, 0, 0)
             totalSpeedChangeWhileBraking += prevData["speed"] - data[i]["speed"]
             numBrakeVals += 1
         else:
-            colorVal = (0, throttleVal ** 2, 0)
+            colorVal = (0, throttleVal**2, 0)
 
         x = data[i]["loc"][0]
         y = data[i]["loc"][1]
-        
+
         prevData = data[i]
-        
+
         plt.plot(x, y, lapMarkers[data[i]["lap"] - 1], color=colorVal)
         progressBar.next()
 else:
     points = []
     for i in data:
-        # Add a list of x, y, speed, and throttle/brake values to points 
-        points.append([data[i]["loc"][0], data[i]["loc"][1], data[i]["speed"], data[i]["throttle"] - data[i]["brake"]])
+        # Add a list of x, y, speed, and throttle/brake values to points
+        points.append(
+            [
+                data[i]["loc"][0],
+                data[i]["loc"][1],
+                data[i]["speed"],
+                data[i]["throttle"] - data[i]["brake"],
+            ]
+        )
         # if data[i]["brake"] != 0:
         #     numBrakeVals += 1
         #     totalSpeedChangeWhileBraking = data[i]["speed"] - prevData["speed"]
         # prevData = data[i]
         progressBar.next()
-    
+
     # Convert our list of points into a Pandas DataFrame to use with Plotly
     df = pd.DataFrame(points, columns=["x", "y", "z", "throttle/brake"])
-    
-    # Plot the DataFrame 
-    fig = px.scatter_3d(df, x="x", y="y", z="z", color="throttle/brake", color_continuous_scale=[[0, "rgb(225,0,0)"], [1, "rgb(0,225,0)"]], range_color=[-1, 1], labels={"x": "X", "y": "Y", "z": "Speed (kph)"})
+
+    # Plot the DataFrame
+    fig = px.scatter_3d(
+        df,
+        x="x",
+        y="y",
+        z="z",
+        color="throttle/brake",
+        color_continuous_scale=[[0, "rgb(225,0,0)"], [1, "rgb(0,225,0)"]],
+        range_color=[-1, 1],
+        labels={"x": "X", "y": "Y", "z": "Speed (kph)"},
+    )
     fig.show()
-    
+
 progressBar.finish()
 print()
 # print(f"Average speed change while braking: {totalSpeedChangeWhileBraking / numBrakeVals}\n")

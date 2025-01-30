@@ -174,14 +174,9 @@ class ThrottleController:
                 # if speed is not decreasing fast, hit the brake.
                 if self.brake_ticks <= 0 and speed_change < 2.5:
                     # start braking, and set for how many ticks to brake
-                    self.brake_ticks = (
-                        round(
-                            (
-                                speed_data.current_speed
-                                - speed_data.recommended_speed_now
-                            )
-                            / 3
-                        )
+                    self.brake_ticks = round(
+                        (speed_data.current_speed - speed_data.recommended_speed_now)
+                        / 3
                     )
                     # self.brake_ticks = 1, or (1 or 2 but not more)
                     self.dprint(

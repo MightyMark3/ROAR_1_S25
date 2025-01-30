@@ -97,16 +97,16 @@ class RoarCompetitionSolution:
         )
 
         sectionLocations = [
-            [-278, 372], # Section 0 start location
-            [64, 890], # Section 1 start location
-            [511, 1037], # Section 2 start location
-            [762, 908], # Section 3 start location
-            [198, 307], # Section 4 start location
-            [-11, 60], # Section 5 start location
-            [-85, -339], # Section 6 start location
-            [-210, -1060], # Section 7 start location 
-            [-318, -991], # Section 8 start location
-            [-352, -119], # Section 9 start location
+            [-278, 372],  # Section 0 start location
+            [64, 890],  # Section 1 start location
+            [511, 1037],  # Section 2 start location
+            [762, 908],  # Section 3 start location
+            [198, 307],  # Section 4 start location
+            [-11, 60],  # Section 5 start location
+            [-85, -339],  # Section 6 start location
+            [-210, -1060],  # Section 7 start location
+            [-318, -991],  # Section 8 start location
+            [-352, -119],  # Section 9 start location
         ]
         for i in sectionLocations:
             self.section_indeces.append(
@@ -181,7 +181,7 @@ class RoarCompetitionSolution:
         )
 
         steerMultiplier = round((current_speed_kmh + 0.001) / 120, 3)
-        
+
         if self.current_section == 2:
             steerMultiplier *= 1.2
         if self.current_section in [3]:
@@ -207,7 +207,7 @@ class RoarCompetitionSolution:
             "reverse": 0,
             "target_gear": gear,  # Gears do not appear to have an impact on speed
         }
-        
+
         if useDebug:
             debugData[self.num_ticks] = {}
             debugData[self.num_ticks]["loc"] = [
@@ -326,7 +326,7 @@ Steer: {control['steer']:.10f} \n"
             num_points = 5
             next_waypoint_index = self.current_waypoint_idx + 28
         if self.current_section == 7:
-            # Jolt between sections 6 and 7 likely due to the differences in lookahead values and steering multipliers. 
+            # Jolt between sections 6 and 7 likely due to the differences in lookahead values and steering multipliers.
             num_points = round(lookahead_value * 1.25)
         if self.current_section == 9:
             (self.current_waypoint_idx + 8) % len(self.maneuverable_waypoints)

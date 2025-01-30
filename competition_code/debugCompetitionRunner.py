@@ -272,9 +272,7 @@ async def evaluate_solution(
                 is None
             ):
                 vehicle.close()
-                return {
-                    "elapsed_time": start_time - world.last_tick_elapsed_seconds
-                }
+                return {"elapsed_time": start_time - world.last_tick_elapsed_seconds}
 
         await solution.step()
         await world.step()
@@ -337,7 +335,7 @@ if __name__ == "__main__":
                 slowestLap = i
         elif i is None:
             failedLaps += 1
-        else: 
+        else:
             canceledLaps += 1
 
     print(f"\nRun times: ")

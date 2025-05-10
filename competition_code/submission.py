@@ -13,6 +13,7 @@ import numpy as np
 import roar_py_interface
 from LateralController import LatController
 from ThrottleController import ThrottleController
+from SectionStats import SectionStats
 import atexit
 
 # from scipy.interpolate import interp1d
@@ -20,6 +21,10 @@ import atexit
 useDebug = True
 useDebugPrinting = False
 debugData = {}
+dbg_carLocations = []
+dbg_wpsToFollow = []
+dbg_str = []
+dbg_str2 = []
 
 
 def dist_to_waypoint(location, waypoint: roar_py_interface.RoarPyWaypoint):
@@ -34,7 +39,15 @@ def filter_waypoints(
     for i in range(current_idx, len(waypoints) + current_idx):
         if dist_to_waypoint(location, waypoints[i % len(waypoints)]) < 3:
             return i % len(waypoints)
-    return current_idx
+    min_dist = 1000
+    min_ind = current_idx
+    for i in range(0, 20):
+        ind = (current_idx + i) % len(waypoints)
+        d = dist_to_waypoint(location, waypoints[ind])
+        if d < min_dist:
+            min_dist = d
+            min_ind = ind
+    return min_ind
 
 
 def findClosestIndex(location, waypoints: List[roar_py_interface.RoarPyWaypoint]):
@@ -50,14 +63,33 @@ def findClosestIndex(location, waypoints: List[roar_py_interface.RoarPyWaypoint]
 
 @atexit.register
 def saveDebugData():
-    if useDebug:
-        print("Saving debug data")
-        jsonData = json.dumps(debugData, indent=4)
-        with open(
-            f"{os.path.dirname(__file__)}\\debugData\\debugData.json", "w+"
-        ) as outfile:
-            outfile.write(jsonData)
-        print("Debug Data Saved")
+    print("Saving...")
+    fname = "\\debugData\\line.txt"
+    with open(
+        f"{os.path.dirname(__file__)}{fname}", "w+"
+    ) as outfile:
+        outfile.write("--- Locatons\n")
+        for line in dbg_carLocations:
+            outfile.write(f"{line}\n")
+        outfile.write("\n--- wpsToFollow\n")
+        for line in dbg_wpsToFollow:
+            outfile.write(f"{line}\n")
+        outfile.write("\n--- Debug str\n")
+        for line in dbg_str2:
+            outfile.write(f"{line}\n")
+        outfile.write("\n--- More Debug str\n")
+        for line in dbg_str:
+            outfile.write(f"{line}\n")
+    print(f"Saved. {fname}")
+
+    # if useDebug:
+    #     print("Saving debug data")
+    #     jsonData = json.dumps(debugData, indent=4)
+    #     with open(
+    #         f"{os.path.dirname(__file__)}\\debugData\\debugData.json", "w+"
+    #     ) as outfile:
+    #         outfile.write(jsonData)
+    #     print("Debug Data Saved")
 
 
 class RoarCompetitionSolution:
@@ -82,11 +114,17 @@ class RoarCompetitionSolution:
         self.collision_sensor = collision_sensor
         self.lat_controller = LatController()
         self.throttle_controller = ThrottleController()
+        self.section_stats = None
         self.section_indeces = []
         self.num_ticks = 0
-        self.section_start_ticks = 0
+        # self.section_start_ticks = 0
         self.current_section = 0
         self.lapNum = 1
+        self.previous_waypoint_to_follow = None
+        self.max_radius = 10000
+        self.radius_at_waypoint = []
+        self.previous_location = None
+        self.total_dist = 0
 
     async def initialize(self) -> None:
         # NOTE waypoints are changed through this line
@@ -95,6 +133,8 @@ class RoarCompetitionSolution:
                 np.load(f"{os.path.dirname(__file__)}\\waypoints\\waypointsPrimary.npz")
             )[35:]
         )
+        self.section_stats = SectionStats(
+            self.maneuverable_waypoints, self.location_sensor, self.velocity_sensor)
 
         sectionLocations = [
             [-278, 372], # Section 0 start location
@@ -127,6 +167,9 @@ class RoarCompetitionSolution:
         self.current_waypoint_idx = filter_waypoints(
             vehicle_location, self.current_waypoint_idx, self.maneuverable_waypoints
         )
+        self.radius_at_waypoint = self.precompute_radius()
+        self.previous_location = vehicle_location
+
 
     async def step(self) -> None:
         """
@@ -135,6 +178,7 @@ class RoarCompetitionSolution:
         You can do whatever you want here, including apply_action() to the vehicle.
         """
         self.num_ticks += 1
+        self.section_stats.step()
 
         # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
@@ -154,12 +198,12 @@ class RoarCompetitionSolution:
                 abs(self.current_waypoint_idx - section_ind) <= 2
                 and i != self.current_section
             ):
-                print(f"Section {i}: {self.num_ticks - self.section_start_ticks} ticks")
-                self.section_start_ticks = self.num_ticks
+                # print(f"Section {i}: {self.num_ticks - self.section_start_ticks} ticks")
+                # self.section_start_ticks = self.num_ticks
                 self.current_section = i
                 if self.current_section == 0 and self.lapNum != 3:
                     self.lapNum += 1
-                    print(f"\nLap {self.lapNum}\n")
+                    # print(f"\nLap {self.lapNum}\n")
 
         nextWaypointIndex = self.get_lookahead_index(current_speed_kmh)
         waypoint_to_follow = self.next_waypoint_smooth(current_speed_kmh)
@@ -170,14 +214,18 @@ class RoarCompetitionSolution:
         )
 
         # Custom controller to control the vehicle's speed
+        num_points_before_lookahead = 9
+        wp_len = len(self.maneuverable_waypoints)
+        wp_ind_for_throttle = ((nextWaypointIndex + wp_len) - num_points_before_lookahead) % wp_len
         waypoints_for_throttle = (self.maneuverable_waypoints * 2)[
-            nextWaypointIndex : nextWaypointIndex + 300
+            wp_ind_for_throttle : wp_ind_for_throttle + 500
         ]
-        throttle, brake, gear = self.throttle_controller.run(
+        throttle, brake, gear, speed_data = self.throttle_controller.run(
             waypoints_for_throttle,
             vehicle_location,
             current_speed_kmh,
             self.current_section,
+            num_points_before_lookahead,
         )
 
         steerMultiplier = round((current_speed_kmh + 0.001) / 120, 3)
@@ -199,9 +247,10 @@ class RoarCompetitionSolution:
         if self.current_section == 9:
             steerMultiplier = max(steerMultiplier, 1.6)
 
+        steer_value = np.clip(steer_control * steerMultiplier, -1, 1)
         control = {
             "throttle": np.clip(throttle, 0, 1),
-            "steer": np.clip(steer_control * steerMultiplier, -1, 1),
+            "steer": steer_value,
             "brake": np.clip(brake, 0, 1),
             "hand_brake": 0,
             "reverse": 0,
@@ -209,30 +258,54 @@ class RoarCompetitionSolution:
         }
         
         if useDebug:
-            debugData[self.num_ticks] = {}
-            debugData[self.num_ticks]["loc"] = [
-                round(vehicle_location[0].item(), 3),
-                round(vehicle_location[1].item(), 3),
-            ]
-            debugData[self.num_ticks]["throttle"] = round(float(control["throttle"]), 3)
-            debugData[self.num_ticks]["brake"] = round(float(control["brake"]), 3)
-            debugData[self.num_ticks]["steer"] = round(float(control["steer"]), 10)
-            debugData[self.num_ticks]["speed"] = round(current_speed_kmh, 3)
-            debugData[self.num_ticks]["lap"] = self.lapNum
+            dbg_carLocations.append(f"{vehicle_location[0]}, {vehicle_location[1]}")
+            dbg_wpsToFollow.append(f"{waypoint_to_follow.location[0]}, {waypoint_to_follow.location[1]}")
 
-            if useDebugPrinting and self.num_ticks % 5 == 0:
-                print(
-                    f"- Target waypoint: ({waypoint_to_follow.location[0]:.2f}, {waypoint_to_follow.location[1]:.2f}) index {nextWaypointIndex} \n\
-Current location: ({vehicle_location[0]:.2f}, {vehicle_location[1]:.2f}) index {self.current_waypoint_idx} section {self.current_section} \n\
-Distance to target waypoint: {math.sqrt((waypoint_to_follow.location[0] - vehicle_location[0]) ** 2 + (waypoint_to_follow.location[1] - vehicle_location[1]) ** 2):.3f}\n"
-                )
+            self.total_dist += np.linalg.norm(vehicle_location - self.previous_location)
+            self.previous_location = vehicle_location
+            # s = f"{self.total_dist:.0f}, {current_speed_kmh:.0f}, {speed_data.recommended_speed_now:.0f}, {speed_data.target_speed_at_distance:.0f}, {speed_data.distance_to_section:.1f}, {speed_data.name}, {self.current_section}, {brake*10:.2f}"
+            s = f"{self.total_dist:.0f}, {current_speed_kmh:.0f}, {speed_data.recommended_speed_now:.0f}, {self.current_section}, {brake*10:.2f}"
+            dbg_str.append(s)
 
-                print(
-                    f"--- Speed: {current_speed_kmh:.2f} kph \n\
-Throttle: {control['throttle']:.3f} \n\
-Brake: {control['brake']:.3f} \n\
-Steer: {control['steer']:.10f} \n"
-                )
+            # st = f"{self.total_dist:.0f}, {current_speed_kmh:.0f}, {steer_value:.6f}, {steer_control:.6f}, {steerMultiplier:.6f}"
+            # dbg_wpsToFollow.append(st)
+
+            wpl = waypoint_to_follow.location
+            d = np.linalg.norm(waypoint_to_follow.location - vehicle_location)
+            s = f"d {self.total_dist:.0f} tick {self.num_ticks} index {self.current_waypoint_idx} \
+speed {current_speed_kmh:.2f} \
+thr {control['throttle']:.3f} \
+br {control['brake']:.3f} \
+st: {control['steer']:.10f} target wp: ind {nextWaypointIndex} {nextWaypointIndex - self.current_waypoint_idx} {d:.1f} \
+loc: ({vehicle_location[0]:.2f}, {vehicle_location[1]:.2f}) wp({wpl[0]:.1f}, {wpl[1]:.1f}) section {self.current_section}"
+            dbg_str2.append(s)
+
+
+#         if useDebug:
+#             debugData[self.num_ticks] = {}
+#             debugData[self.num_ticks]["loc"] = [
+#                 round(vehicle_location[0].item(), 3),
+#                 round(vehicle_location[1].item(), 3),
+#             ]
+#             debugData[self.num_ticks]["throttle"] = round(float(control["throttle"]), 3)
+#             debugData[self.num_ticks]["brake"] = round(float(control["brake"]), 3)
+#             debugData[self.num_ticks]["steer"] = round(float(control["steer"]), 10)
+#             debugData[self.num_ticks]["speed"] = round(current_speed_kmh, 3)
+#             debugData[self.num_ticks]["lap"] = self.lapNum
+
+#             if useDebugPrinting and self.num_ticks % 5 == 0:
+#                 print(
+#                     f"- Target waypoint: ({waypoint_to_follow.location[0]:.2f}, {waypoint_to_follow.location[1]:.2f}) index {nextWaypointIndex} \n\
+# Current location: ({vehicle_location[0]:.2f}, {vehicle_location[1]:.2f}) index {self.current_waypoint_idx} section {self.current_section} \n\
+# Distance to target waypoint: {math.sqrt((waypoint_to_follow.location[0] - vehicle_location[0]) ** 2 + (waypoint_to_follow.location[1] - vehicle_location[1]) ** 2):.3f}\n"
+#                 )
+
+#                 print(
+#                     f"--- Speed: {current_speed_kmh:.2f} kph \n\
+# Throttle: {control['throttle']:.3f} \n\
+# Brake: {control['brake']:.3f} \n\
+# Steer: {control['steer']:.10f} \n"
+#                 )
 
         await self.vehicle.apply_action(control)
         return control
@@ -373,3 +446,52 @@ Steer: {control['steer']:.10f} \n"
             target_waypoint = self.maneuverable_waypoints[next_waypoint_index]
 
         return target_waypoint
+
+    def precompute_radius(self):
+        # for each waypoint compute turn radius using 3 points
+        #   (point which is 10 points before this point), 
+        #   (this point), 
+        #   (point which is 10 points after this points)
+        waypoints = self.maneuverable_waypoints
+        dist = 10
+        r_list = [self.max_radius] * len(waypoints)
+        for i in range(0, len(waypoints)):
+            s = (i - dist) % (len(waypoints))
+            e = (i + dist) % (len(waypoints))
+            radius = self.get_radius([waypoints[s], waypoints[i], waypoints[e]])
+            r_list[i] = radius
+        return r_list
+
+    def get_radius(self, wp):
+        """Returns the radius of a curve given 3 waypoints using the Menger Curvature Formula
+        Args:
+            wp ([roar_py_interface.RoarPyWaypoint]): A list of 3 RoarPyWaypoints
+        Returns:
+            float: The radius of the curve made by the 3 given waypoints
+        """
+
+        point1 = (wp[0].location[0], wp[0].location[1])
+        point2 = (wp[1].location[0], wp[1].location[1])
+        point3 = (wp[2].location[0], wp[2].location[1])
+
+        # Calculating length of all three sides
+        len_side_1 = round(math.dist(point1, point2), 3)
+        len_side_2 = round(math.dist(point2, point3), 3)
+        len_side_3 = round(math.dist(point1, point3), 3)
+
+        small_num = 1
+
+        if len_side_1 < small_num or len_side_2 < small_num or len_side_3 < small_num:
+            return self.max_radius
+
+        # sp is semi-perimeter
+        sp = (len_side_1 + len_side_2 + len_side_3) / 2
+
+        # Calculating area using Herons formula
+        area_squared = sp * (sp - len_side_1) * (sp - len_side_2) * (sp - len_side_3)
+        if area_squared < small_num:
+            return self.max_radius
+
+        # Calculating curvature using Menger curvature formula
+        radius = (len_side_1 * len_side_2 * len_side_3) / (4 * math.sqrt(area_squared))
+        return radius

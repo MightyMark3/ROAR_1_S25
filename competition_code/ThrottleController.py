@@ -1,8 +1,9 @@
 import numpy as np
+import os
+import csv
 import math
 from collections import deque
-from typing import List
-from typing import Tuple
+from typing import List, Tuple
 from SpeedData import SpeedData
 import roar_py_interface
 
@@ -12,6 +13,20 @@ def distance_p_to_p(
 ):
     return np.linalg.norm(p2.location[:2] - p1.location[:2])
 
+def new_location_index(vehicle_location, current_idx, locations) -> int:
+    for i in range(current_idx, len(locations) + current_idx):
+        ind = i % len(locations)
+        if np.linalg.norm(vehicle_location[:2] - locations[ind][:2]) < 3:
+            return ind
+    min_dist = 1000
+    min_ind = current_idx
+    for i in range(0, 20):
+        ind = (current_idx + i) % len(locations)
+        d = np.linalg.norm(vehicle_location[:2] - locations[ind][:2])
+        if d < min_dist:
+            min_dist = d
+            min_ind = ind
+    return min_ind
 
 class ThrottleController:
     display_debug = False
@@ -30,21 +45,27 @@ class ThrottleController:
         self.tick_counter = 0
         self.previous_speed = 1.0
         self.brake_ticks = 0
+        self.prev_locations = deque(maxlen=20)
+        self.current_location_idx = 0
+        self.location_and_radius = self.load_location_and_radius_data(
+            f"{os.path.dirname(__file__)}\\waypoints\\location_with_radius")
+
 
     # def __del__(self):
     #     print("done")
 
     def run(
-        self, waypoints, current_location, current_speed, current_section, num_points_before_lookahead
+        self, waypoints, current_location, current_speed, current_section, additional_waypoints
     ) -> Tuple[float, float, int]:
         self.tick_counter += 1
+        self.current_location_idx = new_location_index(
+            current_location, self.current_location_idx, self.location_and_radius)
 
-        # if current_section in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
-        if True:
-            throttle, brake, speed_data = self.get_throttle_and_brake(
-                current_location, current_speed, current_section, waypoints[num_points_before_lookahead:])
+        if current_section in [3]:
+            throttle, brake, speed_data = self.get_throttle_and_brake_2(
+                current_location, current_speed, current_section, additional_waypoints)
         else:
-            throttle, brake, speed_data = self.get_throttle_and_brake_new(
+           throttle, brake, speed_data = self.get_throttle_and_brake(
                 current_location, current_speed, current_section, waypoints)
 
         gear = max(1, int(current_speed / 60))
@@ -56,6 +77,7 @@ class ThrottleController:
         #             + "     loc x,z" + str(self.agent.vehicle.transform.location.x)
         #             + " " + str(self.agent.vehicle.transform.location.z))
 
+        self.prev_locations.appendleft(current_location)
         self.previous_speed = current_speed
         if self.brake_ticks > 0 and brake > 0:
             self.brake_ticks -= 1
@@ -355,6 +377,7 @@ class ThrottleController:
         )
         # start = self.agent.vehicle.transform
         points.append(start)
+        self.target_distance[0] = 0
         curr_dist = 0
         num_points = 0
         for p in more_waypoints:
@@ -369,7 +392,7 @@ class ThrottleController:
                 points.append(end)
                 dist.append(curr_dist)
             start = end
-            if len(points) >= len(self.target_distance):
+            if len(points) >= len(self.intended_target_distance):
                 break
 
         self.dprint("wp dist " + str(dist))
@@ -389,6 +412,9 @@ class ThrottleController:
         point2 = (wp[1].location[0], wp[1].location[1])
         point3 = (wp[2].location[0], wp[2].location[1])
 
+        return self.get_radius_from_points(point1, point2, point3)
+
+    def get_radius_from_points(self, point1, point2, point3):
         # Calculating length of all three sides
         len_side_1 = round(math.dist(point1, point2), 3)
         len_side_2 = round(math.dist(point2, point3), 3)
@@ -411,6 +437,12 @@ class ThrottleController:
         radius = (len_side_1 * len_side_2 * len_side_3) / (4 * math.sqrt(area_squared))
 
         return radius
+
+    def get_radius_from_locations(self, loc1, loc2, loc3):
+        point1 = (loc1[0], loc1[1])
+        point2 = (loc2[0], loc2[1])
+        point3 = (loc3[0], loc3[1])
+        return self.get_radius_from_points(point1, point2, point3)
 
     def get_target_speed(self, radius: float, current_section: int):
         """Returns a target speed based on the radius of the turn and the section it is in
@@ -474,99 +506,128 @@ class ThrottleController:
             print(text)
             self.debug_strings.append(text)
 
-    def get_throttle_and_brake_new(self, current_location, current_speed, current_section, waypoints):
-        nw = self.get_next_interesting_waypoints_new(current_location, waypoints)
+    def get_throttle_and_brake_2(self, current_location, current_speed, current_section, waypoints):
+        locations = self.sample_locations(current_location)
         speed_data = []
-        for ind in self.dist_index:
-            # print(f"{str(len(nw))} {str(nw)}")
-            r = self.get_radius([nw[ind], nw[ind+2], nw[ind+4]])
-            target_speed = self.get_target_speed_new(r, current_section, current_location)
-            # dist = self.target_distance[ind]
-            # dist = (self.target_distance[ind] + self.target_distance[ind+4]) / 2 
-            # dist = self.target_distance[ind+3]
-            dist = self.target_distance[ind+2]
-            if dist == 0:
-                dist = 3
+        num_radiuses = len(self.target_distance)-6
+        radius = [0] * num_radiuses
+        distances = [0] * num_radiuses
+        for ind in range(num_radiuses):
+            l1, l2, l3 = locations[ind], locations[ind+3], locations[ind+6]
+            distances[ind] = self.target_distance[ind+3]
+            radius[ind] = self.get_radius_from_locations(l1, l2, l3)
+
+        break_early_d = 3
+        for i in range(len(distances)):
+            if distances[i] > break_early_d:
+                distances[i] -= break_early_d
+
+        for ind in range(num_radiuses):
+            target_speed = self.get_target_speed_new(radius[ind], current_section, current_location)
             speed_data.append(
-              self.speed_for_turn_new(ind, r, dist, target_speed, current_speed, current_section))
+              self.speed_for_turn_new(ind, radius[ind], distances[ind], target_speed, current_speed, current_section))
 
         update = self.select_speed(speed_data)
         throttle, brake = self.speed_data_to_throttle_and_brake(update)
         return throttle, brake, update
-
-    def get_next_interesting_waypoints_new(self, current_location, more_waypoints):
+    
+    def sample_locations(self, current_location):
+        increments = [10] * 19
         points = []
         dist = []  # for debugging
-        start = roar_py_interface.RoarPyWaypoint(current_location, np.ndarray([0, 0, 0]), 0.0)
-        # start = self.agent.vehicle.transform
+        start = self.location_and_radius[self.current_location_idx] 
         points.append(start)
         curr_dist = 0
         total_dist = 0
-        num_points = 0
-        self.target_distance = [0] * len(self.intended_distance_increment)
-        for p in more_waypoints:
-            end = p
-            num_points += 1
-            d = distance_p_to_p(start, end)
+        self.target_distance = [0] * len(increments)
+
+        for i in range(1000):
+            ind = (self.current_location_idx + i) % len(self.location_and_radius)
+            end = self.location_and_radius[ind]
+            d = np.linalg.norm(end[:2] - start[:2])
             curr_dist += d
             total_dist += d
-            if curr_dist > self.intended_distance_increment[len(points)]:
+            if curr_dist > increments[len(points)]:
                 self.target_distance[len(points)] = total_dist
                 points.append(end)
-                dist.append(total_dist)
+                dist.append(curr_dist)
                 curr_dist = 0
             start = end
-            if len(points) >= len(self.intended_distance_increment):
+            if len(points) >= len(increments):
                 break
 
-        self.dprint("wp dist " + str(dist))
+        prev_points = []
+        prev_distances = []
+        for d in [30, 20, 10]:
+            point, actual_dist = self.get_previous_location_at_distance(current_location, d)
+            if actual_dist > 0:
+                prev_points.append(point)
+                prev_distances.append(-actual_dist)
+
+        points = prev_points + points
+        self.target_distance = prev_distances + self.target_distance
+        dist = prev_distances + dist
         # print(f"wp{len(points)} dist{len(dist)} {str(dist)}")
         return points
+
+    def get_previous_location_at_distance(self, current_location, target_distance):
+        if len(self.prev_locations) < 10:
+            return current_location, 0
+        accumulated_distance = 0
+        start = current_location
+        for i in range(len(self.prev_locations)):
+            p1 = self.prev_locations[i]
+            accumulated_distance += np.linalg.norm(p1[:2] - start[:2])
+            if accumulated_distance > target_distance:
+                return p1, accumulated_distance
+            start = p1
+
+        return current_location, 0
 
     def speed_for_turn_new(
         self, name, r, distance: float, target_speed: float, current_speed: float, current_section: int
     ):
         # Takes in a target speed and distance and produces a speed that the car should target. Returns a SpeedData object
+        if distance <= 0:
+            max_speed = target_speed
+            return SpeedData(distance, current_speed, target_speed, max_speed, name, r)
+
         a = 170
         if current_speed > 230:
             a = 200
         elif current_speed > 210:
             a = 185
         ticks_without_speed_decrease = 6
-        # if current_section in [1]:
-        #     ticks_without_speed_decrease = 0
         if current_section in [3]:
-            ticks_without_speed_decrease = 8
-        # if current_section in [4]:
-        #     ticks_without_speed_decrease = 4
-        if current_section in [6]:
-            ticks_without_speed_decrease = 10
-        if current_section in [9]:
-            ticks_without_speed_decrease = -6
+            ticks_without_speed_decrease = 26
 
         break_dist = distance - (ticks_without_speed_decrease / 20) * (current_speed / 3.6)
         if break_dist <= 0:
             max_speed = target_speed
         else:
             max_speed = math.sqrt(target_speed**2 + 2 * a * break_dist)
-        return SpeedData(name, r, distance, current_speed, target_speed, max_speed)
+        return SpeedData(distance, current_speed, target_speed, max_speed, name, r)
 
-    def get_target_speed_new(self, radius: float, current_section: int):
+    def get_target_speed_new(self, radius: float, current_section: int, current_location):
         mu = 2.75
         if radius >= self.max_radius:
             return self.max_speed
 
-        if current_section == 2:
-            mu = 3.35
         if current_section == 3:
-            mu = 3.3
-        if current_section == 4:
-            mu = 2.85
-        if current_section == 6:
-            mu = 3.3
-        if current_section == 9:
-            mu = 2.1
+            mu = 3.6
 
         target_speed = math.sqrt(mu * 9.81 * radius) * 3.6
         return max(20, min(target_speed, self.max_speed))
 
+
+    def load_location_and_radius_data(self, file_path):
+        data = []
+        with open(file_path, 'r') as file:
+            csv_reader = csv.reader(file)
+            for row in csv_reader:
+                try:
+                    numpy_array = np.array([float(x) for x in row])
+                except ValueError:
+                    numpy_array = np.array(row)
+                data.append(numpy_array)
+        return data

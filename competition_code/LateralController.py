@@ -7,7 +7,7 @@ def normalize_rad(rad: float):
 
 
 class LatController:
-    def run(self, vehicle_location, vehicle_rotation, next_waypoint) -> float:
+    def run(self, vehicle_location, vehicle_rotation, next_waypoint_location, current_waypoint_idx) -> float:
         """
         Calculates the steering command using the pure pursuit algorithm.
 
@@ -21,7 +21,7 @@ class LatController:
         """
 
         # Calculate vector pointing from vehicle to next waypoint
-        waypoint_vector = np.array(next_waypoint.location) - np.array(vehicle_location)
+        waypoint_vector = np.array(next_waypoint_location) - np.array(vehicle_location)
 
         # Project waypoint vector onto heading vector to find lookahead point
         distance_to_waypoint = np.linalg.norm(waypoint_vector)
@@ -34,9 +34,14 @@ class LatController:
         alpha = normalize_rad(vehicle_rotation[2]) - normalize_rad(
             math.atan2(waypoint_vector_normalized[1], waypoint_vector_normalized[0])
         )
+        debug_str = ""
+        if 813 < current_waypoint_idx < 840:
+            v_angle = normalize_rad(vehicle_rotation[2])
+            d_angle = normalize_rad(math.atan2(waypoint_vector_normalized[1], waypoint_vector_normalized[0]))
+            debug_str = f"a{alpha} rot{v_angle} {d_angle}"
 
         steering_command = 1.5 * math.atan2(
             2.0 * 4.7 * math.sin(alpha) / distance_to_waypoint, 1.0
         )
 
-        return float(steering_command)
+        return float(steering_command), debug_str
